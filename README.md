@@ -8,8 +8,8 @@ Production-oriented Mongolian streaming starter built with Next.js 16, TypeScrip
 - Homepage, dynamic movie detail, and watch routes
 - Series-ready typed content model
 - Shaka Player shell for DASH/HLS and Widevine integration
-- Protected admin dashboard and Movies CRUD foundation
-- Supabase adapter seam and environment contract
+- Protected admin dashboard with authenticated multipart movie uploads
+- D1 metadata and private R2 video storage bindings
 - Fictional demo content only
 
 ## Local development
@@ -22,6 +22,6 @@ No browser player can make playback mathematically impossible to download. Use e
 
 ## Production integration
 
-Replace `lib/content.ts` with server-only Supabase queries and connect `@supabase/ssr` at `lib/supabase.ts`. Keep service-role keys server-side, validate admin roles on every mutation, and use private object storage with signed upload/playback URLs.
+Demo catalog data lives in `lib/content.ts`. New admin uploads use 8 MB multipart chunks and are stored in the private `MEDIA` R2 binding; searchable metadata is written to the `DB` D1 binding. A transcoding worker should consume `processing` records and produce encrypted HLS/DASH before publishing.
 
 Run `npm run build` for a production build. The project is OpenAI Sites ready through `.openai/hosting.json` and Vercel ready after choosing and configuring production authentication.
