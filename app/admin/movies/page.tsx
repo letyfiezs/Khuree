@@ -1,0 +1,2 @@
+import {requireChatGPTUser} from '@/app/chatgpt-auth';import {AdminShell} from '@/components/admin-shell';import {AdminMovies} from '@/components/admin-movies';import {content} from '@/lib/content';
+export const dynamic='force-dynamic';export default async function Movies(){const user=await requireChatGPTUser('/admin/movies');return <AdminShell user={user} active="movies"><AdminMovies initial={content}/></AdminShell>}
