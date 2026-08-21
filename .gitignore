@@ -36,3 +36,7 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# local movie storage (keep folders, never commit uploaded media/database)
+/storage/*
+!/storage/.gitkeep

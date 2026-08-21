@@ -14,7 +14,7 @@ Production-oriented Mongolian streaming starter built with Next.js 16, TypeScrip
 
 ## Local development
 
-Copy `.env.example` to `.env.local`, run `npm install`, then `npm run dev`. The local Sites runtime supplies a demo signed-in user for `/admin`.
+Run `npm install`, then `npm run dev`. The included `.env.local` enables a development-only local admin. Uploaded source videos are written to `storage/videos/` and movie metadata to `storage/khuree.db`; both survive restarts and are ignored by Git. Open `http://localhost:3000/admin/movies` to upload. Use `npm run dev:sites` only when testing the hosted Cloudflare bindings.
 
 ## Streaming security
 
@@ -22,6 +22,6 @@ No browser player can make playback mathematically impossible to download. Use e
 
 ## Production integration
 
-Demo catalog data lives in `lib/content.ts`. New admin uploads use 8 MB multipart chunks and are stored in the private `MEDIA` R2 binding; searchable metadata is written to the `DB` D1 binding. A transcoding worker should consume `processing` records and produce encrypted HLS/DASH before publishing.
+Demo catalog data lives in `lib/content.ts`. The storage boundary lives in `lib/storage/`: `local.ts` is active during PC testing, while `supabase-adapter.ts` preserves the interface for a later Supabase Database + Storage implementation. Uploads use 8 MB chunks so large source files do not sit in browser memory. A future transcoding worker should consume `processing` records and produce encrypted HLS/DASH before publishing.
 
-Run `npm run build` for a production build. The project is OpenAI Sites ready through `.openai/hosting.json` and Vercel ready after choosing and configuring production authentication.
+Run `npm run build` for the local/Node production build. `npm run build:sites` remains available for the hosted Workers variant after switching the storage adapter back to D1/R2 or Supabase HTTP APIs.
