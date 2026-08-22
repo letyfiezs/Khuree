@@ -10,11 +10,12 @@
     "dev:sites": "vinext dev",
     "build": "next build",
     "build:sites": "vinext build",
-    "start": "vinext start",
+    "start": "next start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {
     "next": "16.2.6",
+    "nodemailer": "^9.0.5",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "shaka-player": "^5.2.7"
@@ -25,6 +26,7 @@
     "@openai/sites-vite-plugin": "^0.1.0 || ^0.2.0",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",

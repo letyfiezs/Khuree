@@ -14,7 +14,14 @@ Production-oriented Mongolian streaming starter built with Next.js 16, TypeScrip
 
 ## Local development
 
-Run `npm install`, then `npm run dev`. The included `.env.local` enables a development-only local admin. Uploaded source videos are written to `storage/videos/` and movie metadata to `storage/khuree.db`; both survive restarts and are ignored by Git. Open `http://localhost:3000/admin/movies` to upload. Use `npm run dev:sites` only when testing the hosted Cloudflare bindings.
+Run `npm install`, then `npm run dev`. Uploaded source videos are written to `storage/videos/`; movie, user, verification, and session records live in `storage/khuree.db`. Both survive restarts and are ignored by Git.
+
+1. Open `http://localhost:3000/signup`.
+2. Register with the email configured as `ADMIN_EMAIL` to create the first admin account; every other email receives the regular user role.
+3. Verify the email. With SMTP configured the link arrives in the inbox. Without SMTP, the local test link is written to `storage/mail-preview/latest-verification.txt`.
+4. Sign in and open `/admin/movies` to upload. Completed local uploads are immediately marked `published` and appear under `/movies`.
+
+For Gmail SMTP, set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER`, `SMTP_PASS` (an App Password), and `MAIL_FROM` in `.env.local`. Never commit these credentials.
 
 ## Streaming security
 
@@ -22,6 +29,6 @@ No browser player can make playback mathematically impossible to download. Use e
 
 ## Production integration
 
-Demo catalog data lives in `lib/content.ts`. The storage boundary lives in `lib/storage/`: `local.ts` is active during PC testing, while `supabase-adapter.ts` preserves the interface for a later Supabase Database + Storage implementation. Uploads use 8 MB chunks so large source files do not sit in browser memory. A future transcoding worker should consume `processing` records and produce encrypted HLS/DASH before publishing.
+Demo catalog data lives in `lib/content.ts`. The storage boundary lives in `lib/storage/`: `local.ts` is active during PC testing, while `supabase-adapter.ts` preserves the interface for a later Supabase Database + Storage implementation. Uploads use 8 MB chunks so large source files do not sit in browser memory. Local files are published immediately; a future production adapter can insert a transcoding step for encrypted HLS/DASH.
 
 Run `npm run build` for the local/Node production build. `npm run build:sites` remains available for the hosted Workers variant after switching the storage adapter back to D1/R2 or Supabase HTTP APIs.

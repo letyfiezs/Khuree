@@ -1,0 +1,2 @@
+import { deleteSession,sessionCookieName } from '@/lib/auth/local-auth';
+export async function POST(request:Request){const cookie=request.headers.get('cookie')?.split(';').map(v=>v.trim()).find(v=>v.startsWith(`${sessionCookieName}=`))?.split('=')[1];deleteSession(cookie);const response=Response.json({ok:true});response.headers.append('Set-Cookie',`${sessionCookieName}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);return response}
