@@ -3,9 +3,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 type StorageCategory = { bytes: number; objects: number };
-type Stats = { updatedAt: string; storage: { bytes: number; objects: number; limitBytes: number; freeTierBytes: number; remainingBytes: number; percent: number; estimatedStorageUsd: number; breakdown: Record<"video" | "subtitle" | "thumbnail" | "hero" | "other", StorageCategory> }; movies: number; users: number; totalViews: number; uniqueViews: number; todayViews: number; uniqueViewers7d: number; days: { date: string; views: number }[]; topMovies: { title: string; views: number }[] };
+type Stats = { updatedAt: string; storage: { bytes: number; objects: number; limitBytes: number; freeTierBytes: number; remainingBytes: number; percent: number; estimatedStorageUsd: number; breakdown: Record<"video" | "subtitle" | "thumbnail" | "hero" | "other", StorageCategory> }; operations: { configured: boolean; classA: number; classB: number; other: number; classARemaining: number; classBRemaining: number; classACostUsd: number; classBCostUsd: number; error?: string }; movies: number; users: number; totalViews: number; uniqueViews: number; todayViews: number; uniqueViewers7d: number; days: { date: string; views: number }[]; topMovies: { title: string; views: number }[] };
 type Recent = { id: string; title: string; year: number; kind: string; status: string; accent: string };
 const gb = (bytes: number) => `${(bytes / 1_000_000_000).toFixed(2)} GB`;
+const compact = (value: number) => new Intl.NumberFormat("mn-MN", { notation: "compact", maximumFractionDigits: 2 }).format(value);
 
 export function AdminLiveStats({ recent }: { recent: Recent[] }) {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -15,7 +16,7 @@ export function AdminLiveStats({ recent }: { recent: Recent[] }) {
     if (!response.ok) { setError("Статистик татаж чадсангүй."); return; }
     setStats(await response.json()); setError("");
   }, []);
-  useEffect(() => { const first = window.setTimeout(() => void load(), 0); const timer = window.setInterval(() => void load(), 15000); return () => { clearTimeout(first); clearInterval(timer); }; }, [load]);
+  useEffect(() => { const first = window.setTimeout(() => void load(), 0); const timer = window.setInterval(() => void load(), 60000); return () => { clearTimeout(first); clearInterval(timer); }; }, [load]);
   const max = Math.max(1, ...(stats?.days.map((day) => day.views) ?? [1]));
   const storageCategories = [
     { key: "video" as const, label: "Видео", color: "#e50914" },
@@ -43,6 +44,14 @@ export function AdminLiveStats({ recent }: { recent: Recent[] }) {
       <article><span>НИЙТ КИНО</span><b>{stats?.movies ?? "—"}</b><small>Supabase</small></article>
       <article><span>ХЭРЭГЛЭГЧ</span><b>{stats?.users ?? "—"}</b><small>Бүртгэлтэй хэрэглэгч</small></article>
     </div>
+    <section className="r2-operations-panel">
+      <div className="panel-title"><div><h2>R2 Class A / Class B</h2><p>Cloudflare-ийн энэ сарын бодит operation metrics · 5 минут тутам шинэчлэгдэнэ</p></div><span>{stats?.operations.configured ? "LIVE" : "SETUP"}</span></div>
+      {stats?.operations.configured ? <div className="r2-operation-grid">
+        <article><header><b>CLASS A</b><em>${stats.operations.classACostUsd.toFixed(2)}</em></header><strong>{compact(stats.operations.classA)}</strong><small>1 саяас {compact(stats.operations.classARemaining)} үлдсэн</small><div><i style={{ width: `${Math.min(100, stats.operations.classA / 1_000_000 * 100)}%` }} /></div></article>
+        <article><header><b>CLASS B</b><em>${stats.operations.classBCostUsd.toFixed(2)}</em></header><strong>{compact(stats.operations.classB)}</strong><small>10 саяас {compact(stats.operations.classBRemaining)} үлдсэн</small><div><i style={{ width: `${Math.min(100, stats.operations.classB / 10_000_000 * 100)}%` }} /></div></article>
+        <article className="operation-total"><header><b>REQUEST ЗАРДАЛ</b></header><strong>${(stats.operations.classACostUsd + stats.operations.classBCostUsd).toFixed(2)}</strong><small>Cloudflare-ийн rounding орсон ойролцоо дүн</small></article>
+      </div> : <p className="r2-operations-setup">{stats?.operations.error ?? "Cloudflare metrics холбож байна…"}</p>}
+    </section>
     <section className="storage-breakdown-panel">
       <div className="panel-title"><div><h2>R2 файлын дэлгэрэнгүй</h2><p>Файлын төрөл тус бүрийн бодит тоо ба хэмжээ</p></div><span>{stats?.storage.objects ?? 0} файл</span></div>
       <div className="storage-breakdown-body">

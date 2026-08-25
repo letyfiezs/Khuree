@@ -38,6 +38,7 @@ R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
 R2_BUCKET_NAME=khuree-movies
 R2_PUBLIC_URL=https://pub-....r2.dev
+CLOUDFLARE_API_TOKEN=... # Account Analytics Read эрхтэй token; admin Class A/B metrics-д ашиглана
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 

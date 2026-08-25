@@ -2,6 +2,7 @@ import { apiAdmin } from "@/lib/admin";
 import { getR2StorageUsage } from "@/lib/r2";
 import { R2_HARD_LIMIT_BYTES } from "@/lib/r2";
 import { createSupabaseAdminClient } from "@/lib/supabase";
+import { getR2OperationMetrics } from "@/lib/cloudflare-r2-analytics";
 
 export async function GET() {
   if (!(await apiAdmin())) return Response.json({ error: "Админ эрх шаардлагатай." }, { status: 401 });
@@ -9,8 +10,9 @@ export async function GET() {
   const now = new Date();
   const today = new Date(now); today.setUTCHours(0, 0, 0, 0);
   const week = new Date(today); week.setUTCDate(week.getUTCDate() - 6);
-  const [storage, movies, users, allEvents] = await Promise.all([
+  const [storage, operations, movies, users, allEvents] = await Promise.all([
     getR2StorageUsage(),
+    getR2OperationMetrics(),
     db.from("movies").select("id", { count: "exact", head: true }),
     db.from("profiles").select("id", { count: "exact", head: true }),
     db.from("analytics_events").select("movie_id,viewer_id,created_at,movies(title)").eq("event_type", "play").order("created_at").limit(50000),
@@ -35,6 +37,7 @@ export async function GET() {
       percent: Math.min(100, storage.bytes / storageLimitBytes * 100),
       estimatedStorageUsd,
     },
+    operations,
     movies: movies.count ?? 0, users: users.count ?? 0, totalViews: events.length, uniqueViews: uniqueEvents.length,
     todayViews: uniqueEvents.filter((event) => event.created_at >= today.toISOString()).length,
     uniqueViewers7d: new Set(uniqueEvents.filter((event) => event.created_at >= week.toISOString()).map((event) => event.viewer_id)).size,

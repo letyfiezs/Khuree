@@ -431,6 +431,23 @@
 .storage-meter { height: 4px; margin-top: 12px; overflow: hidden; border-radius: 5px; background: #28282c; }
 .storage-meter i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #35c77d, #e50914); }
 .storage-breakdown-panel { margin-top: 14px; padding: 20px; border: 1px solid #222; border-radius: 8px; background: #111113; }
+.r2-operations-panel { margin-top: 14px; padding: 20px; border: 1px solid #222; border-radius: 8px; background: linear-gradient(145deg,#111113,#0d0d0f); }
+.r2-operations-panel .panel-title { display:flex;align-items:flex-start;justify-content:space-between;gap:18px }
+.r2-operations-panel .panel-title h2 { margin:0 0 5px;font-size:15px }
+.r2-operations-panel .panel-title p { margin:0;color:#666;font-size:9px }
+.r2-operations-panel .panel-title>span { color:#55dc8f;font-size:9px;font-weight:900;letter-spacing:.12em }
+.r2-operation-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px }
+.r2-operation-grid article { padding:16px;border:1px solid #29292d;border-radius:8px;background:#151517 }
+.r2-operation-grid header { display:flex;justify-content:space-between;align-items:center }
+.r2-operation-grid header b { color:#aaa;font-size:9px;letter-spacing:.1em }
+.r2-operation-grid header em { color:#55dc8f;font-size:10px;font-style:normal }
+.r2-operation-grid strong { display:block;margin:10px 0 4px;font-size:25px }
+.r2-operation-grid small,.r2-operations-setup { color:#68686f;font-size:9px }
+.r2-operation-grid article>div { height:4px;margin-top:13px;overflow:hidden;border-radius:4px;background:#28282c }
+.r2-operation-grid article>div i { display:block;height:100%;border-radius:4px;background:#e50914 }
+.r2-operation-grid article:first-child>div i { background:#f4b942 }
+.r2-operations-setup { margin:18px 0 0;padding:14px;border:1px dashed #34343a;border-radius:7px }
+@media(max-width:760px){.r2-operation-grid{grid-template-columns:1fr}.r2-operations-panel{padding:15px}}
 .storage-breakdown-panel .panel-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .storage-breakdown-panel .panel-title h2 { margin: 0 0 5px; font-size: 15px; }
 .storage-breakdown-panel .panel-title p { margin: 0; color: #666; font-size: 9px; }

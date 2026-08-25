@@ -9,6 +9,27 @@
     0 2px 3px #000,
     0 0 7px #000;
 }
+.cinema-player .custom-subtitle {
+  position: absolute;
+  z-index: 7;
+  left: max(18px, env(safe-area-inset-left));
+  right: max(18px, env(safe-area-inset-right));
+  transform: translateY(-50%);
+  pointer-events: none;
+  white-space: pre-line;
+  text-align: center;
+  color: var(--subtitle-color);
+  font-family: Arial, sans-serif;
+  font-size: clamp(15px, calc(1.35vw * var(--subtitle-size-number, 1)), 36px);
+  font-weight: 700;
+  line-height: 1.35;
+  text-shadow: 0 2px 3px #000, 0 0 8px #000, 1px 1px 1px #000;
+  filter: drop-shadow(0 2px 2px #000);
+}
+.cinema-player .custom-subtitle::first-line { background: rgba(0,0,0,.46); }
+@media(max-width:760px),(pointer:coarse){
+  .cinema-player .custom-subtitle{left:12px;right:12px;font-size:clamp(14px,calc(4vw * var(--subtitle-size-number, 1)),27px)}
+}
 .cinema-player .player-brand {
   color: #ffffff55;
   pointer-events: none;

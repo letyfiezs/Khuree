@@ -26,6 +26,34 @@ type ShakaInstance = {
   selectVariantTrack: (track: QualityTrack, clearBuffer?: boolean) => void;
   addEventListener: (type: string, listener: (event: Event) => void) => void;
 };
+type SubtitleCue = { start: number; end: number; text: string };
+const parseCueTime = (value: string) => {
+  const parts = value.trim().replace(",", ".").split(":").map(Number);
+  if (parts.some((part) => !Number.isFinite(part))) return Number.NaN;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return Number.NaN;
+};
+const cleanCueText = (value: string) => value
+  .replace(/<br\s*\/?>/gi, "\n")
+  .replace(/<[^>]+>/g, "")
+  .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&")
+  .replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").trim();
+const parseWebVtt = (source: string): SubtitleCue[] => {
+  const lines = source.replace(/^\uFEFF/, "").replace(/\r/g, "").split("\n");
+  const cues: SubtitleCue[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!lines[index].includes("-->")) continue;
+    const [rawStart, rawEnd] = lines[index].split("-->");
+    const start = parseCueTime(rawStart);
+    const end = parseCueTime(rawEnd.trim().split(/\s+/)[0]);
+    const body: string[] = [];
+    for (index += 1; index < lines.length && lines[index].trim(); index += 1) body.push(lines[index]);
+    const text = cleanCueText(body.join("\n"));
+    if (Number.isFinite(start) && Number.isFinite(end) && end > start && text) cues.push({ start, end, text });
+  }
+  return cues.sort((a, b) => a.start - b.start);
+};
 const formatTime = (seconds: number) => {
   if (!Number.isFinite(seconds)) return "00:00";
   const hours = Math.floor(seconds / 3600);
@@ -81,6 +109,8 @@ export function PlayerShell({
   const [playerOrientation, setPlayerOrientation] = useState<"portrait" | "landscape">("landscape");
   const [seekFeedback, setSeekFeedback] = useState<-10 | 10 | null>(null);
   const [speedHolding, setSpeedHolding] = useState(false);
+  const [subtitleCues, setSubtitleCues] = useState<SubtitleCue[]>([]);
+  const [visibleSubtitle, setVisibleSubtitle] = useState("");
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem("khuree-player-preferences") ?? "{}") as { subtitleEnabled?: boolean; subtitleSize?: number; subtitleColor?: string; subtitlePosition?: string };
@@ -243,20 +273,28 @@ export function PlayerShell({
     };
   }, [manifestUrl, autoPlay]);
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
     const selected = subtitles.find((track) => track.id === activeSubtitle);
-    Array.from(video.textTracks).forEach((track) => {
-      track.mode =
-        selected && track.label === selected.label ? "showing" : "disabled";
-      if (track.cues)
-        Array.from(track.cues).forEach((cue) => {
-          const positionedCue = cue as VTTCue;
-          positionedCue.snapToLines = false;
-          positionedCue.line = Number(subtitlePosition);
-        });
-    });
-  }, [activeSubtitle, subtitles, subtitlePosition]);
+    const controller = new AbortController();
+    setVisibleSubtitle("");
+    setSubtitleCues([]);
+    if (!selected) return () => controller.abort();
+    void fetch(`/api/subtitles/${selected.key}`, { cache: "no-store", credentials: "same-origin", signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Subtitle ${response.status}`);
+        return response.text();
+      })
+      .then((content) => setSubtitleCues(parseWebVtt(content)))
+      .catch((fetchError) => { if (fetchError instanceof Error && fetchError.name !== "AbortError") console.error("Subtitle load failed", fetchError); });
+    return () => controller.abort();
+  }, [activeSubtitle, subtitles]);
+
+  useEffect(() => {
+    if (activeSubtitle === "off") setVisibleSubtitle("");
+    else {
+      const time = videoRef.current?.currentTime ?? 0;
+      setVisibleSubtitle(subtitleCues.find((cue) => time >= cue.start && time < cue.end)?.text ?? "");
+    }
+  }, [activeSubtitle, subtitleCues]);
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -420,6 +458,7 @@ export function PlayerShell({
       style={
         {
           "--subtitle-size": `${subtitleSize}%`,
+          "--subtitle-size-number": subtitleSize / 100,
           "--subtitle-color": subtitleColor,
         } as React.CSSProperties
       }
@@ -469,6 +508,7 @@ export function PlayerShell({
         onTimeUpdate={(event) => {
           const video = event.currentTarget;
           setCurrent(video.currentTime);
+          setVisibleSubtitle(activeSubtitle === "off" ? "" : subtitleCues.find((cue) => video.currentTime >= cue.start && video.currentTime < cue.end)?.text ?? "");
           if (video.seekable.length) {
             setSeekStart(video.seekable.start(0));
             setSeekEnd(video.seekable.end(video.seekable.length - 1));
@@ -480,18 +520,8 @@ export function PlayerShell({
           setMuted(event.currentTarget.muted);
         }}
         aria-label={`${title} видео тоглуулагч`}
-      >
-        {subtitles.map((track) => (
-          <track
-            key={track.id}
-            src={`/api/subtitles/${track.key}`}
-            kind="subtitles"
-            srcLang={track.language}
-            label={track.label}
-            default={track.id === subtitles[0]?.id}
-          />
-        ))}
-      </video>
+      />
+      {visibleSubtitle && <div className="custom-subtitle" style={{ top: `${subtitlePosition}%` }} aria-live="off">{visibleSubtitle}</div>}
       <div className="mobile-gesture-layer" onPointerDown={gesturePointerDown} onPointerUp={(event) => finishGesture(event)} onPointerCancel={(event) => finishGesture(event, true)} />
       {seekFeedback && <div className={`tap-feedback ${seekFeedback < 0 ? "left" : "right"}`}><b>{seekFeedback > 0 ? "+10" : "−10"}</b><span>секунд</span></div>}
       {speedHolding && <div className="speed-feedback"><b>2×</b><span>Хурдасгаж байна</span></div>}
