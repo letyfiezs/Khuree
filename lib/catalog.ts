@@ -1,3 +1,17 @@
-import {content,type ContentItem,type ContentKind} from './content';import {movieStorage} from './storage';
-export function getCatalog(kind?:ContentKind){const uploaded:ContentItem[]=movieStorage.listMovies().filter(movie=>movie.status==='published').map(movie=>({id:movie.id,slug:movie.slug,title:movie.title,synopsis:movie.synopsis,year:new Date(movie.createdAt).getFullYear(),duration:'Шинэ',age:'13+',rating:0,genre:movie.categories,kind:'movie',status:'published',accent:'#7f1018',videoKey:movie.videoKey}));const all=[...uploaded,...content.filter(item=>item.status==='published')];return kind?all.filter(item=>item.kind===kind):all}
-export function getCatalogItem(slug:string){return getCatalog().find(item=>item.slug===slug)}
+import { content, type ContentItem, type ContentKind } from "./content";
+import { getMovieBySlug, listMovies } from "./movies";
+import { listPublicSeries } from "./public-series";
+export async function getCatalog(kind?: ContentKind) {
+  const databaseItems = (await listMovies()).filter((item) => item.status === "published");
+  const all = [...databaseItems, ...content.filter((item) => item.status === "published")];
+  return kind ? all.filter((item) => item.kind === kind) : all;
+}
+export async function getCatalogItem(slug: string): Promise<ContentItem | undefined> {
+  return (await getMovieBySlug(slug)) ?? content.find((item) => item.slug === slug);
+}
+export async function getBrowseCatalog(kind?: ContentKind) {
+  const [movies, series] = await Promise.all([getCatalog("movie"), listPublicSeries()]);
+  if (kind === "movie") return movies;
+  if (kind === "series") return series;
+  return [...series, ...movies];
+}

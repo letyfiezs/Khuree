@@ -1,0 +1,5 @@
+import "server-only";
+import { createHmac } from "node:crypto";
+export function normalizeIdentifier(kind:"phone"|"email",value:string){const normalized=value.trim().toLowerCase();if(kind==="phone"&&!/^\+976\d{8}$/.test(normalized))throw new Error("8 оронтой Монгол дугаар оруулна уу.");if(kind==="email"&&!/^\S+@\S+\.\S+$/.test(normalized))throw new Error("Имэйл хаяг буруу байна.");return normalized;}
+export function authEmail(kind:"phone"|"email",identifier:string){if(kind==="email")return identifier;const secret=process.env.ADMIN_SESSION_SECRET||process.env.SUPABASE_SERVICE_ROLE_KEY;if(!secret)throw new Error("Server auth secret тохируулаагүй байна.");const key=createHmac("sha256",secret).update(identifier).digest("hex").slice(0,32);return `${key}@phone.khuree.local`;}
+export function pinPassword(identifier:string,pin:string){if(!/^\d{4}$/.test(pin))throw new Error("4 оронтой PIN оруулна уу.");const secret=process.env.ADMIN_SESSION_SECRET||process.env.SUPABASE_SERVICE_ROLE_KEY;if(!secret)throw new Error("Server auth secret тохируулаагүй байна.");return createHmac("sha256",secret).update(`pin:${identifier}:${pin}`).digest("base64url");}

@@ -23,9 +23,23 @@ Run `npm install`, then `npm run dev`. Uploaded source videos are written to `st
 
 For Gmail SMTP, set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER`, `SMTP_PASS` (an App Password), and `MAIL_FROM` in `.env.local`. Never commit these credentials.
 
+## QPay төлбөр
+
+`/subscribe` хуудас QPay Merchant V2-оор VIP нэхэмжлэх үүсгэнэ. Төлбөрийг зөвхөн QPay callback ирсний дараа QPay API-аар дахин шалгаж, төлсөн дүн тохирсон үед хэрэглэгчийн VIP хугацааг сунгана. Нэхэмжлэх болон эрхийн хугацаа `storage/khuree.db`-д хадгалагдана.
+
+1. QPay Merchant байгууллагын эрхээс `username`, `password`, `invoice code` авна.
+2. `.env.example`-ийг дагаж `QPAY_*` утгуудыг `.env.local`-д оруулна.
+3. Sandbox туршилтад `QPAY_BASE_URL=https://merchant-sandbox.qpay.mn` ашиглана.
+4. `QPAY_CALLBACK_URL` нь QPay серверээс нэвтрэх боломжтой HTTPS URL байх ёстой. `localhost` callback-ийг production болон алсын sandbox сервер дуудаж чадахгүй.
+5. Production-д QPay-аас зөвшөөрөл авсны дараа base URL-ийг `https://merchant.qpay.mn` болгон солино.
+
+QPay нууц утгууд зөвхөн сервер талд ашиглагддаг бөгөөд browser руу дамжихгүй. Одоо байгаа контент автоматаар түгжигдээгүй; `subscriptions` хүснэгтийн идэвхтэй эрхийг контентын entitlement дүрэмтэй дараагийн шатанд холбоно.
+
 ## Streaming security
 
 No browser player can make playback mathematically impossible to download. Use encrypted DASH/HLS, short-lived signed manifest and segment URLs, server-side authorization, forensic watermarking, and DRM license delivery (Widevine, FairPlay, PlayReady). Never ship permanent MP4 URLs or signing secrets to the client.
+
+The player is multi-DRM ready through `NEXT_PUBLIC_WIDEVINE_LICENSE_URL`, `NEXT_PUBLIC_PLAYREADY_LICENSE_URL`, and `NEXT_PUBLIC_FAIRPLAY_LICENSE_URL`. These must point to an authenticated license proxy that applies entitlement, concurrency, expiry, and device rules. Clear MP4 uploads are not DRM protected: package source media as CENC/CBCS encrypted DASH/HLS with Shaka Packager or a managed encoding/DRM provider before publishing. A `controlsList="nodownload"` attribute or hidden URL is only a UI deterrent and must not be presented as DRM.
 
 ## Production integration
 

@@ -1,0 +1,48 @@
+@media (max-width: 900px) {
+  .channel-list {
+    display: block;
+  }
+  .channel-list > div:first-child {
+    display: flex;
+  }
+  .channel-scroll {
+    max-height: 520px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-snap-type: y proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+  .channel-scroll > button {
+    min-height: 66px;
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    padding: 10px 12px;
+  }
+  .channel-scroll button > i {
+    width: 46px;
+    height: 46px;
+  }
+  .channel-scroll strong {
+    font-size: 12px;
+  }
+  .channel-scroll small {
+    font-size: 9px;
+  }
+}
+@media (max-width: 560px) {
+  .channel-list {
+    margin: 0 8px;
+  }
+  .channel-scroll {
+    max-height: 58vh;
+  }
+  .channel-search {
+    height: 46px;
+  }
+  .channel-scroll > button {
+    min-height: 70px;
+  }
+}

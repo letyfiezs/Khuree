@@ -1,2 +1,22 @@
-import {requireAdmin} from '@/lib/auth/local-auth';import {AdminShell} from '@/components/admin-shell';import {AdminMovies} from '@/components/admin-movies';import {content,type ContentItem} from '@/lib/content';import {movieStorage} from '@/lib/storage';
-export const dynamic='force-dynamic';export default async function Movies(){const user=await requireAdmin();const localItems:ContentItem[]=movieStorage.listMovies().map(movie=>({id:movie.id,slug:movie.slug,title:movie.title,synopsis:movie.synopsis,year:new Date(movie.createdAt).getFullYear(),duration:'Шууд үзэх',age:'13+',rating:0,genre:movie.categories,kind:'movie',status:movie.status,accent:'#581018',videoKey:movie.videoKey}));return <AdminShell user={user} active="movies"><AdminMovies initial={[...localItems,...content]}/></AdminShell>}
+import { requireAdmin } from "@/lib/auth/local-auth";
+import { AdminShell } from "@/components/admin-shell";
+import { AdminMovies } from "@/components/admin-movies";
+import type { ContentItem } from "@/lib/content";
+import { listMovies } from "@/lib/movies";
+import { listCategories } from "@/lib/categories";
+export const dynamic = "force-dynamic";
+export default async function Movies() {
+  const user = await requireAdmin();
+  const localItems: ContentItem[] = await listMovies();
+  const categories = await listCategories();
+  return (
+    <AdminShell user={user} active="movies">
+      <AdminMovies
+        initial={localItems.filter(
+          (item) => item.kind === "movie" && item.age !== "18+",
+        )}
+        categories={categories.map((item) => item.name)}
+      />
+    </AdminShell>
+  );
+}

@@ -1,2 +1,23 @@
-import Link from 'next/link';import {requireAdmin} from '@/lib/auth/local-auth';import {AdminShell} from '@/components/admin-shell';import {getCatalog} from '@/lib/catalog';
-export const dynamic='force-dynamic';export default async function Admin(){const user=await requireAdmin();const content=getCatalog();const published=content.filter(x=>x.status==='published').length;return <AdminShell user={user}><div className="admin-toolbar"><div><h1>Өдрийн мэнд, {user.name}</h1><p>Хүрээ платформын өнөөдрийн тойм</p></div><Link href="/admin/movies" className="primary-button">＋ Контент нэмэх</Link></div><div className="stats"><article><span>НИЙТ БҮТЭЭЛ</span><b>{content.length}</b><small>Local database</small></article><article><span>НИЙТЭЛСЭН</span><b>{published}</b><small>Каталогт харагдана</small></article><article><span>ҮЗЭЛТ</span><b>128.4K</b><small>Demo analytics</small></article><article><span>ХЭРЭГЛЭГЧ</span><b>Local</b><small>Email auth идэвхтэй</small></article></div><div className="admin-panels"><article><div className="panel-title"><h2>Сүүлийн бүтээлүүд</h2><Link href="/admin/movies">Бүгдийг харах →</Link></div>{content.slice(0,3).map(x=><div className="recent-item" key={x.id}><i style={{background:x.accent}}/><span><b>{x.title}</b><small>{x.kind==='movie'?'Кино':'Цуврал'} · {x.year}</small></span><em className={`status ${x.status}`}>Нийтэлсэн</em></div>)}</article><article><div className="panel-title"><h2>7 хоногийн үзэлт</h2><span>128,402</span></div><div className="chart">{[36,52,43,72,61,88,76].map((n,i)=><i key={i} style={{height:`${n}%`}}/>)}</div></article></div></AdminShell>}
+import Link from "next/link";
+import { requireAdmin } from "@/lib/auth/local-auth";
+import { AdminShell } from "@/components/admin-shell";
+import { getCatalog } from "@/lib/catalog";
+import { AdminLiveStats } from "@/components/admin-live-stats";
+export const dynamic = "force-dynamic";
+export default async function Admin() {
+  const [user, content] = await Promise.all([requireAdmin(), getCatalog()]);
+  return (
+    <AdminShell user={user}>
+      <div className="admin-toolbar">
+        <div>
+          <h1>Өдрийн мэнд, {user.name}</h1>
+          <p>Хүрээ платформын өнөөдрийн тойм</p>
+        </div>
+        <Link href="/admin/movies" className="primary-button">
+          ＋ Контент нэмэх
+        </Link>
+      </div>
+      <AdminLiveStats recent={content.slice(0, 4).map(({ id, title, year, kind, status, accent }) => ({ id, title, year, kind, status, accent }))} />
+    </AdminShell>
+  );
+}

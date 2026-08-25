@@ -1,3 +1,86 @@
-import Link from 'next/link';import {SiteHeader} from '@/components/site-header';
-const films=[{title:'ХӨХ ТЭНГЭРИЙН ДОР',meta:'2026 • 2ц 14м',tone:'from-slate-700 to-slate-950',tag:'ШИНЭ',slug:'hoh-tengeriin-dor'},{title:'ХОТЫН СҮҮДЭР',meta:'2025 • 1ц 48м',tone:'from-red-950 to-zinc-950',tag:'4K',slug:'huiten-mur'},{title:'ЗЭРЛЭГ САЛХИ',meta:'2026 • 8 анги',tone:'from-amber-900 to-stone-950',tag:'ЦУВРАЛ',slug:'zerleg-salhi'},{title:'ЦАГААН ШӨНӨ',meta:'2024 • 1ц 56м',tone:'from-indigo-950 to-zinc-950',tag:'18+',slug:'tsagaan-shono'},{title:'СҮҮЛЧИЙН ӨРТӨӨ',meta:'2025 • 2ц 03м',tone:'from-emerald-950 to-black',tag:'HD',slug:'huiten-mur'}];
-export default function Home(){return <main><SiteHeader/><section className="hero"><div className="hero-glow"/><div className="hero-content"><p className="eyebrow"><span/> ХҮРЭЭ ОРИГИНАЛ</p><h1>ХҮЙТЭН<br/><em>МӨР</em></h1><div className="hero-meta"><b>IMDb 8.7</b><span>2026</span><span>16+</span><span>2ц 08м</span><span className="quality">4K</span></div><p className="hero-copy">Цасан шуурганд тасарсан уулын сууринд нэгэн мөрдөгч өнгөрсөнтэйгөө нүүр тулна. Үнэнийг нуусан мөр бүр түүнийг гэрт нь улам ойртуулна.</p><div className="hero-actions"><Link href="/watch/huiten-mur" className="primary-button">▶ &nbsp;Үзэх</Link><Link href="/movie/huiten-mur" className="secondary-button">ⓘ &nbsp;Дэлгэрэнгүй</Link></div></div><div className="hero-index"><b>01</b><span>/ 05</span><i/></div></section><section className="catalog" id="movies"><div className="section-heading"><div><p className="section-kicker">ОДОО ҮЗЭХ</p><h2>Онцлох бүтээлүүд</h2></div><Link href="/movies" className="see-all">Бүгдийг үзэх →</Link></div><div className="film-rail">{films.map(film=><Link href={`/movie/${film.slug}`} className="film-card" key={film.title}><div className={`poster bg-gradient-to-br ${film.tone}`}><span className="poster-mark">ХҮРЭЭ</span><span className="poster-title">{film.title}</span><span className="film-tag">{film.tag}</span><span className="play-chip">▶</span></div><h3>{film.title}</h3><p>{film.meta}</p></Link>)}</div></section></main>}
+import Link from "next/link";
+import { SiteHeader } from "@/components/site-header";
+import { getBrowseCatalog } from "@/lib/catalog";
+import { HomeRail } from "@/components/home-rail";
+import { popularMovieIds } from "@/lib/popular";
+import { RecentlyWatched } from "@/components/recently-watched";
+
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const allItems = await getBrowseCatalog();
+  const items = allItems.filter((item) => item.age !== "18+");
+  const movies = items.filter((item) => item.kind === "movie");
+  const series = items.filter((item) => item.kind === "series");
+  const adult = allItems.filter((item) => item.age === "18+");
+  const popularIds = await popularMovieIds();
+  const popular = [...items].sort((a,b) => {
+    const ai=popularIds.indexOf(a.id), bi=popularIds.indexOf(b.id);
+    return (ai<0?Number.MAX_SAFE_INTEGER:ai)-(bi<0?Number.MAX_SAFE_INTEGER:bi);
+  });
+  const featured = items.find((item) => item.featured) ?? items[0];
+  return (
+    <main>
+      <SiteHeader />
+      {featured ? (
+        <section
+          className={`hero ${featured.backdropUrl || featured.posterUrl ? "has-featured-poster" : ""} ${featured.backdropUrl ? "has-backdrop" : ""}`}
+        >
+          {(featured.backdropUrl || featured.posterUrl) && (
+            <div
+              className="hero-poster-art"
+              style={{
+                backgroundImage: `url(${featured.backdropUrl || featured.posterUrl})`,
+                "--hero-x": `${featured.backdropPositionX ?? 50}%`,
+                "--hero-y": `${featured.backdropPositionY ?? 50}%`,
+                "--hero-zoom": (featured.backdropZoom ?? 100) / 100,
+              } as React.CSSProperties}
+            />
+          )}
+          <div className="hero-glow" />
+          <div className="hero-content">
+            <p className="eyebrow">
+              <span /> ШИНЭЭР НЭМЭГДСЭН
+            </p>
+            <h1>{featured.title}</h1>
+            <div className="hero-meta">
+              <span>{featured.year}</span>
+              <span>{featured.age}</span>
+              <span className="quality">HD</span>
+            </div>
+            <p className="hero-copy">{featured.synopsis}</p>
+            <div className="hero-actions">
+              <Link href={featured.kind === "series" && featured.seriesId ? `/series/${featured.seriesId}` : `/watch/${encodeURIComponent(featured.slug)}`} className="primary-button">
+                ▶ &nbsp;Үзэх
+              </Link>
+              <Link
+                href={featured.kind === "series" && featured.seriesId ? `/series/${featured.seriesId}` : `/movie/${encodeURIComponent(featured.slug)}`}
+                className="secondary-button"
+              >
+                ⓘ &nbsp;Дэлгэрэнгүй
+              </Link>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="hero empty-hero">
+          <div className="hero-content">
+            <p className="eyebrow">
+              <span /> ХҮРЭЭ
+            </p>
+            <h1>ТАНЫ КАТАЛОГ</h1>
+            <p className="hero-copy">
+              Админ хэсгээс анхны кино эсвэл олон ангит бүтээлээ нэмнэ үү.
+            </p>
+          </div>
+        </section>
+      )}
+      <RecentlyWatched />
+      <HomeRail kicker="ОДОО ҮЗЭХ" title="Шинээр нэмэгдсэн" href="/movies" items={items} />
+      <HomeRail kicker="ТӨЛБӨРГҮЙ ҮЗЭХ" title="Үнэгүй" href="/movies" items={movies} />
+      <HomeRail kicker="ҮЗЭГЧДИЙН СОНГОЛТ" title="Их үзэлттэй" href="/movies" items={popular} />
+      <HomeRail kicker="АНГИ БҮР ШИНЭ ТҮҮХ" title="Олон ангит" href="/series" items={series} />
+      <HomeRail kicker="НАСАНД ХҮРЭГЧДЭД" title="+18" href="/adult" items={adult} />
+    </main>
+  );
+}

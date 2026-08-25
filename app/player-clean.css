@@ -1,0 +1,63 @@
+.cinema-player video::cue {
+  color: var(--subtitle-color);
+  font-size: var(--subtitle-size);
+  font-family: Arial, sans-serif;
+  font-weight: 600;
+  line-height: 1.35;
+  background: rgba(0, 0, 0, 0.42);
+  text-shadow:
+    0 2px 3px #000,
+    0 0 7px #000;
+}
+.cinema-player .player-brand {
+  color: #ffffff55;
+  pointer-events: none;
+}
+.cinema-player .player-shade {
+  inset: 68% 0 0;
+  background: linear-gradient(transparent, #000b);
+}
+.cinema-player .center-play.paused-only {
+  width: 62px;
+  height: 62px;
+  border: 1px solid #ffffff38;
+  background: #080808a6;
+  backdrop-filter: blur(8px);
+  font-size: 19px;
+  padding-left: 5px;
+  opacity: 0.82;
+  z-index: 2;
+}
+.cinema-player:hover .center-play.paused-only {
+  opacity: 0.82;
+}
+.cinema-player .center-play.paused-only:hover {
+  opacity: 1;
+  transform: scale(1.06);
+}
+.live-unmute {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  z-index: 4;
+  border: 1px solid #ffffff35;
+  background: #080808d9;
+  color: #fff;
+  border-radius: 20px;
+  padding: 9px 13px;
+  font-size: 10px;
+  box-shadow: 0 8px 30px #000;
+}
+.control-row .live-edge {
+  width: auto;
+  padding: 0 10px;
+  border-radius: 5px;
+  color: #ff313b;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+.detail-art.has-image {
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}

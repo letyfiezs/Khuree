@@ -1,0 +1,29 @@
+.channel-scroll {
+  display: flex !important;
+  flex-direction: column !important;
+  flex-wrap: nowrap !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+.channel-scroll > button {
+  flex: 0 0 auto;
+  width: 100%;
+}
+.channel-list {
+  position: sticky;
+  top: 92px;
+  max-height: calc(100vh - 110px);
+  overflow: hidden;
+}
+.channel-scroll {
+  max-height: calc(100vh - 230px);
+}
+@media (max-width: 900px) {
+  .channel-list {
+    position: static;
+    max-height: none;
+  }
+  .channel-scroll {
+    max-height: 520px;
+  }
+}

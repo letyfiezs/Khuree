@@ -1,0 +1,26 @@
+.cinema-player .player-controls,
+.cinema-player .player-shade,
+.cinema-player .player-brand {
+  transition:
+    opacity 0.28s ease,
+    transform 0.28s ease;
+}
+.cinema-player.controls-hidden {
+  cursor: none;
+}
+.cinema-player.controls-hidden .player-controls,
+.cinema-player.controls-hidden .player-shade,
+.cinema-player.controls-hidden .player-brand {
+  opacity: 0;
+  pointer-events: none;
+}
+.cinema-player.controls-hidden .player-controls {
+  transform: translateY(12px);
+}
+.cinema-player.controls-visible .player-controls,
+.cinema-player.controls-visible .player-shade {
+  opacity: 1;
+}
+.cinema-player .player-settings {
+  z-index: 6;
+}
