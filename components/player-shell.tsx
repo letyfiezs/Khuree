@@ -83,6 +83,7 @@ export function PlayerShell({
   const seekFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const gestureHoldTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const gestureSingleTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const subtitleFrameRef = useRef<number | undefined>(undefined);
   const gestureRef = useRef({ pointerId: -1, held: false, previousRate: 1, lastTapAt: 0, lastSide: "" });
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -148,6 +149,7 @@ export function PlayerShell({
     if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
     if (gestureHoldTimerRef.current) clearTimeout(gestureHoldTimerRef.current);
     if (gestureSingleTimerRef.current) clearTimeout(gestureSingleTimerRef.current);
+    if (subtitleFrameRef.current) cancelAnimationFrame(subtitleFrameRef.current);
   }, []);
   useEffect(() => {
     let player: ShakaInstance | undefined;
@@ -295,6 +297,32 @@ export function PlayerShell({
       setVisibleSubtitle(subtitleCues.find((cue) => time >= cue.start && time < cue.end)?.text ?? "");
     }
   }, [activeSubtitle, subtitleCues]);
+  useEffect(() => {
+    if (!playing || activeSubtitle === "off" || !subtitleCues.length) {
+      if (subtitleFrameRef.current) cancelAnimationFrame(subtitleFrameRef.current);
+      subtitleFrameRef.current = undefined;
+      if (activeSubtitle === "off") setVisibleSubtitle("");
+      return;
+    }
+    let cancelled = false;
+    let previousText = "";
+    const syncSubtitle = () => {
+      if (cancelled) return;
+      const time = videoRef.current?.currentTime ?? 0;
+      const nextText = subtitleCues.find((cue) => time >= cue.start && time < cue.end)?.text ?? "";
+      if (nextText !== previousText) {
+        previousText = nextText;
+        setVisibleSubtitle(nextText);
+      }
+      subtitleFrameRef.current = requestAnimationFrame(syncSubtitle);
+    };
+    subtitleFrameRef.current = requestAnimationFrame(syncSubtitle);
+    return () => {
+      cancelled = true;
+      if (subtitleFrameRef.current) cancelAnimationFrame(subtitleFrameRef.current);
+      subtitleFrameRef.current = undefined;
+    };
+  }, [playing, activeSubtitle, subtitleCues]);
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
