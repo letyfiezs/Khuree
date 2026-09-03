@@ -1,15 +1,39 @@
 "use client";
-import { useRef, useState } from "react";
-import type { ContentItem } from "@/lib/content";
+import { useMemo, useRef, useState } from "react";
+import { audioLabels, type AudioLabel, type ContentItem } from "@/lib/content";
 import type { SubtitleTrack } from "@/lib/storage/types";
 type UploadState = "idle" | "uploading" | "processing" | "done" | "error";
-type EditableTrack = SubtitleTrack & { content: string };
+type EditableTrack = SubtitleTrack & { content?: string };
+
+function containsFourCc(bytes: Uint8Array, code: string) {
+  const expected = [...code].map((character) => character.charCodeAt(0));
+  for (let index = 0; index <= bytes.length - expected.length; index += 1) {
+    if (expected.every((value, offset) => bytes[index + offset] === value)) return true;
+  }
+  return false;
+}
+
+async function incompatibleMp4Codec(file: File) {
+  if (!file.name.toLowerCase().endsWith(".mp4")) return undefined;
+  const probeSize = 4 * 1024 * 1024;
+  const probes = [file.slice(0, probeSize)];
+  if (file.size > probeSize) probes.push(file.slice(Math.max(0, file.size - probeSize)));
+  const bytes = await Promise.all(probes.map(async (probe) => new Uint8Array(await probe.arrayBuffer())));
+  const has = (code: string) => bytes.some((probe) => containsFourCc(probe, code));
+  if (has("hvc1") || has("hev1")) return "H.265 / HEVC";
+  if (has("vp09")) return "VP9";
+  if (has("av01")) return "AV1";
+  return undefined;
+}
+
 export function AdminMovies({
   initial,
   mode = "movie",
   categories,
   fixedSeries,
   forcedAgeRating,
+  forcedCategory,
+  sectionTitle,
 }: {
   initial: ContentItem[];
   mode?: "movie" | "series";
@@ -21,14 +45,20 @@ export function AdminMovies({
     seasonNumber: number;
   };
   forcedAgeRating?: string;
+  forcedCategory?: string;
+  sectionTitle?: string;
 }) {
+  const contentCategories = categories.filter((category) => !audioLabels.includes(category as AudioLabel) && category !== forcedCategory);
   const suggestedEpisodeNumber = Math.max(0, ...initial.map((item) => item.episodeNumber ?? 0)) + 1;
   const [items, setItems] = useState(initial);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | ContentItem["status"]>("all");
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [synopsis, setSynopsis] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(forcedCategory ? [forcedCategory] : []);
   const [ageRating, setAgeRating] = useState(forcedAgeRating ?? "13+");
+  const [audioLabel, setAudioLabel] = useState<AudioLabel>("Субтай");
   const [targetQuality, setTargetQuality] = useState("original");
   const [seriesTitle, setSeriesTitle] = useState(fixedSeries?.title ?? "");
   const [seasonNumber, setSeasonNumber] = useState(
@@ -40,6 +70,10 @@ export function AdminMovies({
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+  const visibleItems = useMemo(() => {
+    const search = query.trim().toLocaleLowerCase("mn");
+    return items.filter((item) => (statusFilter === "all" || item.status === statusFilter) && (!search || [item.title, item.slug, item.seriesTitle ?? "", ...item.genre].some((value) => value.toLocaleLowerCase("mn").includes(search))));
+  }, [items, query, statusFilter]);
   const [posterMovie, setPosterMovie] = useState<ContentItem | null>(null);
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [posterSaving, setPosterSaving] = useState(false);
@@ -54,6 +88,7 @@ export function AdminMovies({
   const [editSynopsis, setEditSynopsis] = useState("");
   const [editCategories, setEditCategories] = useState<string[]>([]);
   const [editAgeRating, setEditAgeRating] = useState("13+");
+  const [editAudioLabel, setEditAudioLabel] = useState<AudioLabel>("Субтай");
   const [editSaving, setEditSaving] = useState(false);
   const [editSeriesTitle, setEditSeriesTitle] = useState("");
   const [editSeasonNumber, setEditSeasonNumber] = useState(1);
@@ -68,11 +103,13 @@ export function AdminMovies({
   const [subtitleSaving, setSubtitleSaving] = useState(false);
   const subtitleInput = useRef<HTMLInputElement>(null);
   const subtitleRequest = useRef<AbortController | null>(null);
+  const selectedSubtitleRequest = useRef<string | null>(null);
   const reset = () => {
     setTitle("");
     setSynopsis("");
-    setSelectedCategories([]);
+    setSelectedCategories(forcedCategory ? [forcedCategory] : []);
     setAgeRating(forcedAgeRating ?? "13+");
+    setAudioLabel("Субтай");
     setTargetQuality("original");
     setSeriesTitle(fixedSeries?.title ?? "");
     setSeasonNumber(fixedSeries?.seasonNumber ?? 1);
@@ -109,6 +146,10 @@ export function AdminMovies({
     setUploadState("uploading");
     setProgress(0);
     try {
+      const incompatibleCodec = await incompatibleMp4Codec(video);
+      if (incompatibleCodec) {
+        throw new Error(`${incompatibleCodec} codec-той MP4 нь бүх утас, browser-т тоглохгүй. Upload хийхээс өмнө H.264 + AAC MP4 (fast start) болгож хөрвүүлнэ үү.`);
+      }
       const initResponse = await fetch("/api/admin/uploads", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -164,7 +205,7 @@ export function AdminMovies({
           movie: {
             title: title.trim(),
             synopsis: synopsis.trim(),
-            categories: selectedCategories,
+            categories: [...selectedCategories, audioLabel],
             filename: video.name,
             bytes: video.size,
             contentType: video.type,
@@ -205,6 +246,7 @@ export function AdminMovies({
           accent: "#581018",
           videoKey: result.videoKey,
           subtitles: [],
+          audioLabel,
         },
         ...current,
       ]);
@@ -242,6 +284,29 @@ export function AdminMovies({
       setError(loadError instanceof Error ? loadError.message : "Subtitle мэдээлэл авч чадсангүй.");
     }
   }
+  async function selectSubtitleTrack(track: EditableTrack) {
+    if (!subtitleMovie) return;
+    selectedSubtitleRequest.current = track.id;
+    setTrackId(track.id);
+    setSubtitleLabel(track.label);
+    setSubtitleLanguage(track.language);
+    setSubtitleFilename(track.originalFilename);
+    if (typeof track.content === "string") {
+      setSubtitleContent(track.content);
+      return;
+    }
+    setSubtitleContent("Уншиж байна…");
+    try {
+      const response = await fetch(`/api/admin/movies/${subtitleMovie.id}/subtitles?trackId=${track.id}`);
+      const data = await response.json() as { track?: EditableTrack; error?: string };
+      if (!response.ok || !data.track) throw new Error(data.error ?? "Subtitle агуулга авч чадсангүй.");
+      setTracks((current) => current.map((item) => item.id === track.id ? data.track! : item));
+      if (selectedSubtitleRequest.current === track.id) setSubtitleContent(data.track.content ?? "");
+    } catch (loadError) {
+      setSubtitleContent("");
+      setError(loadError instanceof Error ? loadError.message : "Subtitle агуулга авч чадсангүй.");
+    }
+  }
   async function createEpisodeWithoutVideo() {
     if (
       mode !== "series" ||
@@ -259,7 +324,7 @@ export function AdminMovies({
       body: JSON.stringify({
         title: title.trim(),
         synopsis: synopsis.trim(),
-        categories: selectedCategories,
+        categories: [...selectedCategories, audioLabel],
         ageRating,
         seriesTitle: fixedSeries.title,
         seriesId: fixedSeries.id,
@@ -292,6 +357,7 @@ export function AdminMovies({
         status: "published",
         accent: "#581018",
         subtitles: [],
+        audioLabel,
         seriesTitle: fixedSeries.title,
         seasonNumber: fixedSeries.seasonNumber,
         episodeNumber,
@@ -302,6 +368,7 @@ export function AdminMovies({
     reset();
   }
   const resetTrack = () => {
+    selectedSubtitleRequest.current = null;
     setTrackId(undefined);
     setSubtitleLabel("Монгол");
     setSubtitleLanguage("mn");
@@ -468,8 +535,9 @@ export function AdminMovies({
     setEditMovie(movie);
     setEditTitle(movie.title);
     setEditSynopsis(movie.synopsis);
-    setEditCategories(movie.genre);
+    setEditCategories(Array.from(new Set([...movie.genre, ...(forcedCategory ? [forcedCategory] : [])])));
     setEditAgeRating(movie.age);
+    setEditAudioLabel(movie.audioLabel ?? "Субтай");
     setEditSeriesTitle(movie.seriesTitle ?? "");
     setEditSeasonNumber(movie.seasonNumber ?? 1);
     setEditEpisodeNumber(movie.episodeNumber ?? 1);
@@ -495,7 +563,7 @@ export function AdminMovies({
         body: JSON.stringify({
           title: editTitle.trim(),
           synopsis: editSynopsis.trim(),
-          categories: editCategories,
+          categories: [...editCategories, editAudioLabel],
           ageRating: editAgeRating,
           seriesTitle:
             editMovie.kind === "series" ? editSeriesTitle.trim() : undefined,
@@ -516,6 +584,7 @@ export function AdminMovies({
                 synopsis: editSynopsis.trim(),
                 genre: editCategories,
                 age: editAgeRating,
+                audioLabel: editAudioLabel,
                 seriesTitle: editSeriesTitle.trim() || undefined,
                 seasonNumber: editSeasonNumber,
                 episodeNumber: editEpisodeNumber,
@@ -554,16 +623,24 @@ export function AdminMovies({
   }
   return (
     <>
-      <div className="admin-toolbar">
+      <div className="admin-toolbar content-admin-toolbar">
         <div>
-          <h1>{mode === "series" ? "Олон ангит" : "Кино"}</h1>
-          <p>{items.length} бүтээл · каталогийн удирдлага</p>
+          <p className="section-kicker">КОНТЕНТЫН УДИРДЛАГА</p>
+          <h1>{sectionTitle ?? (mode === "series" ? "Олон ангит" : "Кино")}</h1>
+          <p>Контентоо нэмэх, засах, зураг болон subtitle удирдах</p>
         </div>
         <button className="primary-button" onClick={() => setOpen(true)}>
-          ＋ {mode === "series" ? "Анги" : "Кино"} upload хийх
+          <i>＋</i> {mode === "series" ? "Шинэ анги" : "Шинэ контент"} нэмэх
         </button>
       </div>
-      <div className="admin-table">
+      <div className="content-overview">
+        <article><span>НИЙТ КОНТЕНТ</span><b>{items.length}</b><small>Бүх бүртгэл</small></article>
+        <article><span>НИЙТЭЛСЭН</span><b>{items.filter((item) => item.status === "published").length}</b><small className="positive">● Хэрэглэгчдэд харагдана</small></article>
+        <article><span>БОЛОВСРУУЛЖ БУЙ</span><b>{items.filter((item) => item.status === "processing").length}</b><small>Upload болон хөрвүүлэлт</small></article>
+        <article><span>НИЙТ SUBTITLE</span><b>{items.reduce((total, item) => total + (item.subtitles?.length ?? 0), 0)}</b><small>Бүх бүтээлд</small></article>
+      </div>
+      <div className="content-controls"><label><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Нэр, ангилал, slug-аар хайх" /></label><div>{([['all','Бүгд'],['published','Нийтэлсэн'],['processing','Боловсруулж буй'],['draft','Ноорог']] as const).map(([value,label]) => <button key={value} className={statusFilter === value ? "active" : ""} onClick={() => setStatusFilter(value)}>{label}</button>)}</div><small>{visibleItems.length} үр дүн</small></div>
+      <div className="admin-table content-admin-table">
         <div className="table-head">
           <span>БҮТЭЭЛ</span>
           <span>ТӨРӨЛ</span>
@@ -571,7 +648,7 @@ export function AdminMovies({
           <span>ОН</span>
           <span />
         </div>
-        {items.map((item) => (
+        {visibleItems.map((item) => (
           <div className="table-row" key={item.id}>
             <div className="title-cell">
               <i className={item.posterUrl ? "has-thumbnail" : ""} style={{ background: item.posterUrl ? `url(${item.posterUrl}) center/cover no-repeat` : item.accent }} />
@@ -628,6 +705,7 @@ export function AdminMovies({
             </div>
           </div>
         ))}
+        {!visibleItems.length && <div className="content-empty-state"><i>⌕</i><b>Контент олдсонгүй</b><span>Хайлтын үг эсвэл шүүлтүүрээ өөрчилнө үү.</span></div>}
       </div>
       {open && (
         <div className="modal-backdrop">
@@ -723,6 +801,12 @@ export function AdminMovies({
                 </label>
               )}
               <label>
+                Player тэмдэглэгээ
+                <select value={audioLabel} onChange={(event) => setAudioLabel(event.target.value as AudioLabel)}>
+                  {audioLabels.map((label) => <option value={label} key={label}>{label}</option>)}
+                </select>
+              </label>
+              <label>
                 Upload дараах чанар
                 <select
                   value={targetQuality}
@@ -740,7 +824,7 @@ export function AdminMovies({
                 Ангилал <span>*</span>
               </legend>
               <div className="category-picker">
-                {categories.map((category) => (
+                {contentCategories.map((category) => (
                   <button
                     type="button"
                     className={
@@ -844,13 +928,7 @@ export function AdminMovies({
                     key={track.id}
                   >
                     <button
-                      onClick={() => {
-                        setTrackId(track.id);
-                        setSubtitleLabel(track.label);
-                        setSubtitleLanguage(track.language);
-                        setSubtitleFilename(track.originalFilename);
-                        setSubtitleContent(track.content);
-                      }}
+                      onClick={() => void selectSubtitleTrack(track)}
                     >
                       <strong>{track.label}</strong>
                       <small>
@@ -1047,6 +1125,12 @@ export function AdminMovies({
                 <option value="18+">18+</option>
               </select>
             </label>
+            <label>
+              Player тэмдэглэгээ
+              <select value={editAudioLabel} onChange={(event) => setEditAudioLabel(event.target.value as AudioLabel)}>
+                {audioLabels.map((label) => <option value={label} key={label}>{label}</option>)}
+              </select>
+            </label>
             {editMovie.kind === "series" && (
               <div className="upload-options-grid series-fields">
                 <label>
@@ -1083,7 +1167,7 @@ export function AdminMovies({
             <fieldset>
               <legend>Ангилал</legend>
               <div className="category-picker">
-                {categories.map((category) => (
+                {contentCategories.map((category) => (
                   <button
                     type="button"
                     className={

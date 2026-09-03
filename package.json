@@ -11,7 +11,8 @@
     "build": "next build",
     "build:sites": "vinext build",
     "start": "next start",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "recorder": "node --env-file=.env.local scripts/live-recorder.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1116.0",
@@ -19,6 +20,7 @@
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.3",
     "ffmpeg-static": "^5.2.0",
+    "mpegts.js": "^1.8.2",
     "next": "^16.3.2",
     "nodemailer": "^9.0.5",
     "qpay-js": "^1.0.0",

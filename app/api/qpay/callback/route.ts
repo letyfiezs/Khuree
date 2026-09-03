@@ -1,5 +1,6 @@
 import { getPayment, markPaymentPaid } from "@/lib/payments";
 import { qpayClient, qpaySettings } from "@/lib/qpay";
+import { setUserPlanEntitlement } from "@/lib/user-entitlements";
 
 export const runtime = "nodejs";
 
@@ -7,10 +8,13 @@ async function handle(request: Request) {
   const orderId = new URL(request.url).searchParams.get("order_id");
   if (!orderId)
     return Response.json({ error: "order_id дутуу." }, { status: 400 });
-  const payment = getPayment(orderId);
+  const payment = await getPayment(orderId);
   if (!payment?.invoiceId)
     return Response.json({ error: "Нэхэмжлэх олдсонгүй." }, { status: 404 });
-  if (payment.status === "paid") return Response.json({ ok: true });
+  if (payment.status === "paid") {
+    await setUserPlanEntitlement(payment.userId, payment.plan, { days: qpaySettings().days, source: "qpay", startsAt: payment.paidAt });
+    return Response.json({ ok: true });
+  }
 
   try {
     const check = await qpayClient().checkPayment({
@@ -25,7 +29,9 @@ async function handle(request: Request) {
     );
     if (!paidRows.length || paidAmount < payment.amount)
       return Response.json({ ok: false, status: "pending" }, { status: 202 });
-    markPaymentPaid(orderId, paidRows[0].paymentId, qpaySettings().days);
+    const days = qpaySettings().days;
+    const paid = await markPaymentPaid(orderId, paidRows[0].paymentId);
+    await setUserPlanEntitlement(payment.userId, payment.plan, { days, source: "qpay", startsAt: paid.paidAt });
     return Response.json({ ok: true });
   } catch (error) {
     console.error("QPay callback verification error", error);

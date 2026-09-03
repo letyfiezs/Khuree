@@ -4,6 +4,7 @@ export type SubtitleTrack = {
   language: string;
   key: string;
   originalFilename: string;
+  sourceUrl?: string;
 };
 export type NewMovieRecord = {
   title: string;

@@ -1,5 +1,5 @@
 import { apiAdmin } from "@/lib/admin";
-import { abortMultipart, beginMultipart, deleteR2Object, enforceR2HardLimit, ensureR2StorageCapacity, finishMultipart, objectExists, R2StorageLimitError, signPart } from "@/lib/r2";
+import { abortMultipart, beginMultipart, deleteR2Object, ensureR2StorageCapacity, finishMultipart, recordCompletedR2Upload, R2StorageLimitError, signPart } from "@/lib/r2";
 import { createSupabaseAdminClient } from "@/lib/supabase";
 import { ensureCanonicalSeries } from "@/lib/series-admin";
 
@@ -58,13 +58,6 @@ export async function POST(request: Request) {
       console.error("R2 multipart complete failed", { key, error });
       return Response.json({ error: "R2 файл нэгтгэхэд алдаа гарлаа. Дахин оролдоно уу." }, { status: 502 });
     }
-    if (!(await objectExists(key))) return Response.json({ error: "R2 файл баталгаажаагүй." }, { status: 502 });
-    try { await enforceR2HardLimit(key); }
-    catch (error) {
-      await db.from("orphan_uploads").delete().eq("object_key", key);
-      if (error instanceof R2StorageLimitError) return Response.json({ error: error.message }, { status: 507 });
-      throw error;
-    }
     const movie = (body.movie ?? {}) as { title?: string; synopsis?: string; categories?: string[]; filename?: string; contentType?: string; bytes?: number; releaseYear?: number; duration?: string; rating?: number; ageRating?: string; featured?: boolean; kind?: string; seriesId?: string; seasonId?: string; seasonNumber?: number; episodeNumber?: number };
     if (!movie.title?.trim() || !movie.synopsis?.trim() || !Array.isArray(movie.categories) || !movie.categories.length) { await deleteR2Object(key); await db.from("orphan_uploads").delete().eq("object_key", key); return Response.json({ error: "Киноны мэдээлэл дутуу." }, { status: 400 }); }
     if (movie.kind === "series" && movie.seriesId) {
@@ -94,6 +87,7 @@ export async function POST(request: Request) {
     const { data: genres } = await db.from("genres").select("id,name").in("name", movie.categories);
     if (genres?.length) await db.from("movie_genres").insert(genres.map((g) => ({ movie_id: record.id, genre_id: g.id })));
     await db.from("orphan_uploads").delete().eq("object_key", key);
+    recordCompletedR2Upload(Number(movie.bytes));
     return Response.json({ id: record.id, slug: record.slug, status: record.status, videoKey: record.video_key });
   }
   return Response.json({ error: "Тодорхойгүй үйлдэл." }, { status: 400 });

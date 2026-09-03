@@ -37,6 +37,12 @@ export function AdminShell({
             ▤ <span>Олон ангит</span>
           </Link>
           <Link
+            className={active === "vertical" ? "active" : ""}
+            href="/admin/vertical"
+          >
+            ▯ <span>Босоо драма</span>
+          </Link>
+          <Link
             className={active === "adult" ? "active" : ""}
             href="/admin/adult"
           >
@@ -47,6 +53,12 @@ export function AdminShell({
             href="/admin/live"
           >
             ● <span>Live хяналт</span>
+          </Link>
+          <Link
+            className={active === "users" ? "active" : ""}
+            href="/admin/users"
+          >
+            ◉ <span>Хэрэглэгчид</span>
           </Link>
           <Link href="/movies">
             ◉ <span>Нийтийн каталог</span>

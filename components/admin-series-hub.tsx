@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { SeriesShow } from "@/lib/series-admin";
 export function AdminSeriesHub({
   initial,
@@ -10,6 +10,7 @@ export function AdminSeriesHub({
   categories: string[];
 }) {
   const [shows, setShows] = useState(initial);
+  const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [synopsis, setSynopsis] = useState("");
@@ -23,6 +24,7 @@ export function AdminSeriesHub({
   const [editCategories, setEditCategories] = useState<string[]>([]);
   const [editPoster, setEditPoster] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const visibleShows = useMemo(() => { const search = query.trim().toLocaleLowerCase("mn"); return search ? shows.filter((show) => [show.title, show.synopsis, ...show.categories].some((value) => value.toLocaleLowerCase("mn").includes(search))) : shows; }, [query, shows]);
   async function create(event: React.FormEvent) {
     event.preventDefault();
     const response = await fetch("/api/admin/series", {
@@ -71,17 +73,20 @@ export function AdminSeriesHub({
   }
   return (
     <>
-      <div className="admin-toolbar">
+      <div className="admin-toolbar content-admin-toolbar series-admin-toolbar">
         <div>
+          <p className="section-kicker">ЦУВРАЛЫН УДИРДЛАГА</p>
           <h1>Олон ангит</h1>
-          <p>Эхлээд цуврал, дараа нь бүлэг болон анги үүсгэнэ</p>
+          <p>Цуврал → бүлэг → анги гэсэн дарааллаар контентоо удирдана</p>
         </div>
         <button className="primary-button" onClick={() => setOpen(true)}>
-          ＋ Цуврал үүсгэх
+          <i>＋</i> Шинэ цуврал
         </button>
       </div>
+      <div className="content-overview series-overview"><article><span>НИЙТ ЦУВРАЛ</span><b>{shows.length}</b><small>Бүртгэлтэй бүтээл</small></article><article><span>НАСАНД ХҮРЭГЧДИЙН</span><b>{shows.filter((show) => show.ageRating === "18+").length}</b><small>18+ ангилалтай</small></article><article><span>АНГИЛАЛ</span><b>{new Set(shows.flatMap((show) => show.categories)).size}</b><small>Ашигласан төрөл</small></article></div>
+      <div className="content-controls series-controls"><label><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Цувралын нэр, ангиллаар хайх" /></label><small>{visibleShows.length} цуврал</small></div>
       <div className="series-hub-grid">
-        {shows.map((show) => (
+        {visibleShows.map((show) => (
           <article className="series-admin-card" key={show.id}>
           <Link className="series-card-link" href={`/admin/series/${show.id}`}>
             <i className={show.posterUrl ? "has-poster" : ""} style={show.posterUrl ? { backgroundImage: `url(${show.posterUrl})` } : undefined}>{!show.posterUrl && "▤"}</i>
@@ -97,7 +102,7 @@ export function AdminSeriesHub({
           <button type="button" className="row-action series-edit-button" onClick={() => openEditor(show)}>Засах / Thumbnail</button>
           </article>
         ))}
-        {!shows.length && <p>Одоогоор цуврал үүсгээгүй байна.</p>}
+        {!visibleShows.length && <div className="series-empty-state"><i>▤</i><b>{shows.length ? "Цуврал олдсонгүй" : "Анхны цувралаа үүсгэнэ үү"}</b><span>{shows.length ? "Хайлтын үгээ өөрчилж үзнэ үү." : "Цуврал үүсгээд бүлэг болон анги нэмэх боломжтой."}</span>{!shows.length && <button className="primary-button" onClick={() => setOpen(true)}>＋ Цуврал үүсгэх</button>}</div>}
       </div>
       {open && (
         <div className="modal-backdrop">

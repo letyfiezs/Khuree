@@ -11,15 +11,18 @@ export async function HEAD(
 ) {
   const user = await getCurrentUser();
   if (!user?.emailVerified) return new Response(null, { status: 401 });
+  if (!user.canWatch && user.role !== "admin") return new Response(null, { status: 403 });
   const key = (await params).key;
-  if (!/^[a-f0-9-]{20,50}\.(mp4|mov|mkv|m3u8)$/i.test(key))
+  if (!/^[a-f0-9-]{20,50}\.(mp4|mov|mkv|m3u8|ts)$/i.test(key))
     return new Response(null, { status: 404 });
   const movie = movieStorage.listMovies().find((item) => item.videoKey === key);
   if (movie?.ageRating === "18+" && (!user.adultEnabled || !user.adultUnlocked))
     return new Response(null, { status: 403 });
   try {
     const info = await stat(path.join(videosRoot, key));
-    const contentType = key.endsWith(".m3u8")
+    const contentType = key.endsWith(".ts")
+      ? "video/mp2t"
+      : key.endsWith(".m3u8")
       ? "application/vnd.apple.mpegurl"
       : key.endsWith(".mov")
         ? "video/quicktime"
@@ -45,8 +48,10 @@ export async function GET(
   const user = await getCurrentUser();
   if (!user?.emailVerified)
     return new Response("Unauthorized", { status: 401 });
+  if (!user.canWatch && user.role !== "admin")
+    return new Response("Viewing permission disabled", { status: 403 });
   const key = (await params).key;
-  if (!/^[a-f0-9-]{20,50}\.(mp4|mov|mkv|m3u8)$/i.test(key))
+  if (!/^[a-f0-9-]{20,50}\.(mp4|mov|mkv|m3u8|ts)$/i.test(key))
     return new Response("Not found", { status: 404 });
   const movie = movieStorage.listMovies().find((item) => item.videoKey === key);
   if (movie?.ageRating === "18+" && (!user.adultEnabled || !user.adultUnlocked))
@@ -58,7 +63,9 @@ export async function GET(
   } catch {
     return new Response("Not found", { status: 404 });
   }
-  const contentType = key.endsWith(".m3u8")
+  const contentType = key.endsWith(".ts")
+    ? "video/mp2t"
+    : key.endsWith(".m3u8")
     ? "application/vnd.apple.mpegurl"
     : key.endsWith(".mov")
       ? "video/quicktime"

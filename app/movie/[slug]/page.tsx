@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { getCatalogItem } from "@/lib/catalog";
 import { SiteHeader } from "@/components/site-header";
 import { requireAdultAccess, requireUser } from "@/lib/auth/local-auth";
+import { DetailBackButton } from "@/components/detail-back-button";
+import { isVerticalDrama } from "@/lib/vertical-drama";
 export const dynamic = "force-dynamic";
 export async function generateMetadata({
   params,
@@ -45,9 +47,11 @@ export default async function MovieDetail({
       (a.seasonNumber ?? 0) - (b.seasonNumber ?? 0) ||
       (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0),
   )[0];
+  const backHref = item.age === "18+" ? "/adult" : isVerticalDrama(item) ? "/vertical" : item.kind === "series" ? "/series" : "/movies";
   return (
     <main>
       <SiteHeader />
+      <DetailBackButton fallback={backHref} />
       <section
         className="detail-hero"
         style={{ "--accent": item.accent } as React.CSSProperties}

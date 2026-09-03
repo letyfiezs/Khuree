@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { requireAdultAccess, requireUser } from "@/lib/auth/local-auth";
 import { getPublicSeries } from "@/lib/public-series";
+import { DetailBackButton } from "@/components/detail-back-button";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export default async function PublicSeriesDetail({ params }: { params: Promise<{
   return (
     <main>
       <SiteHeader />
+      <DetailBackButton fallback={show.age === "18+" ? "/adult" : "/series"} />
       <section className="series-public-hero">
         <div className="series-public-art" style={show.backdropUrl || show.posterUrl ? { backgroundImage: `linear-gradient(90deg,#050505 4%,#05050599 52%,#050505 100%),url(${show.backdropUrl || show.posterUrl})` } : undefined} />
         <div className="series-public-content">

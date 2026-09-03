@@ -1,3 +1,23 @@
-import { createSupabaseAdminClient,createSupabaseServerClient } from "@/lib/supabase";
-import { authEmail,normalizeIdentifier,pinPassword } from "@/lib/auth/pin-auth";
-export async function POST(request:Request){try{const body=await request.json() as {kind?:"phone"|"email";identifier?:string;pin?:string;name?:string};if(!body.kind||!body.identifier||!body.pin||!body.name?.trim())return Response.json({error:"Мэдээллээ бүрэн оруулна уу."},{status:400});const identifier=normalizeIdentifier(body.kind,body.identifier);const email=authEmail(body.kind,identifier);const password=pinPassword(identifier,body.pin);const admin=createSupabaseAdminClient();const {data,error}=await admin.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{name:body.name.trim(),phone:body.kind==="phone"?identifier:null,login_kind:body.kind}});if(error||!data.user)return Response.json({error:error?.message.toLowerCase().includes("registered")?"Энэ дугаар эсвэл имэйл бүртгэлтэй байна.":"Бүртгэл үүсгэж чадсангүй."},{status:409});await admin.from("profiles").upsert({id:data.user.id,display_name:body.name.trim(),role:"user"});const supabase=await createSupabaseServerClient();const signed=await supabase.auth.signInWithPassword({email,password});if(signed.error)return Response.json({error:"Бүртгэл үүссэн ч нэвтэрч чадсангүй."},{status:500});return Response.json({ok:true,returnTo:"/movies"});}catch(cause){return Response.json({error:cause instanceof Error?cause.message:"Алдаа гарлаа."},{status:400});}}
+import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase";
+import { authEmail, normalizeIdentifier, pinPassword } from "@/lib/auth/pin-auth";
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json() as { kind?: "phone" | "email"; identifier?: string; pin?: string; name?: string; returnTo?: string };
+    if (!body.kind || !body.identifier || !body.pin || !body.name?.trim()) return Response.json({ error: "Мэдээллээ бүрэн оруулна уу." }, { status: 400 });
+    const identifier = normalizeIdentifier(body.kind, body.identifier);
+    const email = authEmail(body.kind, identifier);
+    const password = pinPassword(identifier, body.pin);
+    const admin = createSupabaseAdminClient();
+    const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { name: body.name.trim(), phone: body.kind === "phone" ? identifier : null, login_kind: body.kind }, app_metadata: { can_watch: false, entitlement: { enabled: false, source: "registration", updatedAt: new Date().toISOString() } } });
+    if (error || !data.user) return Response.json({ error: error?.message.toLowerCase().includes("registered") ? "Энэ дугаар эсвэл имэйл бүртгэлтэй байна." : "Бүртгэл үүсгэж чадсангүй." }, { status: 409 });
+    await admin.from("profiles").upsert({ id: data.user.id, display_name: body.name.trim(), role: "user" });
+    const supabase = await createSupabaseServerClient();
+    const signed = await supabase.auth.signInWithPassword({ email, password });
+    if (signed.error) return Response.json({ error: "Бүртгэл үүссэн ч нэвтэрч чадсангүй." }, { status: 500 });
+    const safe = body.returnTo?.startsWith("/") && !body.returnTo.startsWith("//") ? body.returnTo : "/";
+    return Response.json({ ok: true, returnTo: safe });
+  } catch (cause) {
+    return Response.json({ error: cause instanceof Error ? cause.message : "Алдаа гарлаа." }, { status: 400 });
+  }
+}

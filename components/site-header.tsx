@@ -3,10 +3,15 @@ import { getCurrentUser } from "@/lib/auth/local-auth";
 import { getCatalog } from "@/lib/catalog";
 import { LogoutButton } from "./logout-button";
 import { SearchDialog } from "./search-dialog";
-import { listCategories } from "@/lib/categories";
+import { listPublicCategories } from "@/lib/categories";
+import { audioLabels, type AudioLabel } from "@/lib/content";
 export async function SiteHeader() {
-  const user = await getCurrentUser();
-  const items = (await getCatalog())
+  const [user, catalog, allCategories] = await Promise.all([
+    getCurrentUser(),
+    getCatalog(),
+    listPublicCategories(),
+  ]);
+  const items = catalog
     .filter((item) => item.age !== "18+" || user?.adultUnlocked)
     .map(({ id, slug, title, synopsis, genre, kind, year }) => ({
       id,
@@ -17,18 +22,20 @@ export async function SiteHeader() {
       kind,
       year,
     }));
-  const categories = await listCategories();
+  const categories = allCategories.filter((category) =>
+    category.name !== "Босоо драма" && category.name !== "Орчуулгатай" && !audioLabels.includes(category.name as AudioLabel),
+  );
   return (
     <header className="site-header solid-on-page">
-      <Link href="/" className="brand">
+      <a href="/" className="brand">
         <span>Х</span>ҮРЭЭ
-      </Link>
+      </a>
       <nav>
-        <Link href="/">Нүүр</Link>
+        <a href="/">Нүүр</a>
         <span className="nav-dropdown">
-          <Link href="/movies">Кино⌄</Link>
+          <a href="/movies">Кино⌄</a>
           <span>
-            <Link href="/movies">Бүх кино</Link>
+            <a href="/movies">Бүх кино</a>
             {categories.map((category) => (
               <Link
                 key={category.id}
@@ -40,9 +47,9 @@ export async function SiteHeader() {
           </span>
         </span>
         <span className="nav-dropdown">
-          <Link href="/series">Олон ангит⌄</Link>
+          <a href="/series">Олон ангит⌄</a>
           <span>
-            <Link href="/series">Бүх олон ангит</Link>
+            <a href="/series">Бүх олон ангит</a>
             {categories.map((category) => (
               <Link
                 key={category.id}
@@ -53,10 +60,11 @@ export async function SiteHeader() {
             ))}
           </span>
         </span>
-        <Link className="adult-nav" href="/adult">
+        <a href="/vertical">Босоо драма</a>
+        <a className="adult-nav" href="/adult">
           18+
-        </Link>
-        <Link href="/live">Шууд ТВ</Link>
+        </a>
+        <a href="/live">Шууд ТВ</a>
       </nav>
       <details className="mobile-menu">
         <summary aria-label="Цэс нээх">
@@ -65,11 +73,12 @@ export async function SiteHeader() {
           <span />
         </summary>
         <div>
-          <Link href="/">Нүүр</Link>
-          <Link href="/movies">Кино</Link>
-          <Link href="/series">Олон ангит</Link>
-          <Link href="/adult">18+</Link>
-          <Link href="/live">Шууд ТВ</Link>
+          <a href="/">Нүүр</a>
+          <a href="/movies">Кино</a>
+          <a href="/series">Олон ангит</a>
+          <a href="/vertical">Босоо драма</a>
+          <a href="/adult">18+</a>
+          <a href="/live">Шууд ТВ</a>
           {user ? (
             <>
               <Link className="mobile-vip" href="/subscribe">

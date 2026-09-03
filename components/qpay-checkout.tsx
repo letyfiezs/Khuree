@@ -11,15 +11,22 @@ type Payment = {
   urls: { name: string; description: string; logo: string; link: string }[];
 };
 
-export function QPayCheckout({ price, days }: { price: number; days: number }) {
+type Plan = { id: "movie" | "series" | "vertical" | "adult" | "vip"; name: string; description: string; price: number };
+
+export function QPayCheckout({ authenticated, days, plans }: { authenticated: boolean; days: number; plans: Plan[] }) {
   const [payment, setPayment] = useState<Payment | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<Plan["id"]>("vip");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function createInvoice() {
+    if (!authenticated) {
+      window.location.href = "/login?returnTo=%2Fsubscribe";
+      return;
+    }
     setLoading(true);
     setError("");
-    const response = await fetch("/api/qpay/invoice", { method: "POST" });
+    const response = await fetch("/api/qpay/invoice", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan: selectedPlan }) });
     const data = (await response.json()) as {
       payment?: Payment;
       error?: string;
@@ -28,6 +35,18 @@ export function QPayCheckout({ price, days }: { price: number; days: number }) {
     if (!response.ok || !data.payment)
       return setError(data.error ?? "Нэхэмжлэх үүссэнгүй.");
     setPayment(data.payment);
+  }
+
+  async function checkPayment() {
+    if (!payment) return;
+    setLoading(true);
+    setError("");
+    const response = await fetch(`/api/qpay/status?order_id=${encodeURIComponent(payment.id)}`);
+    const data = await response.json() as { status?: Payment["status"]; error?: string };
+    setLoading(false);
+    if (!response.ok) return setError(data.error ?? "Төлбөр шалгаж чадсангүй.");
+    if (data.status) setPayment((current) => current ? { ...current, status: data.status! } : null);
+    if (data.status === "pending") setError("Төлбөр хараахан баталгаажаагүй байна.");
   }
 
   useEffect(() => {
@@ -49,8 +68,8 @@ export function QPayCheckout({ price, days }: { price: number; days: number }) {
   if (payment?.status === "paid") {
     return (
       <div className="qpay-success">
-        <b>✓ VIP амжилттай идэвхжлээ</b>
-        <span>Одоо бүх premium боломжийг ашиглаж болно.</span>
+        <b>✓ Эрх амжилттай идэвхжлээ</b>
+        <span>Сонгосон багцын контентыг одоо үзэх боломжтой.</span>
       </div>
     );
   }
@@ -59,12 +78,19 @@ export function QPayCheckout({ price, days }: { price: number; days: number }) {
     <div className="qpay-checkout">
       {!payment ? (
         <>
+          <div className="qpay-plans">
+            {plans.map((plan) => (
+              <button key={plan.id} type="button" className={selectedPlan === plan.id ? "selected" : ""} onClick={() => setSelectedPlan(plan.id)}>
+                <b>{plan.name}</b><span>{plan.description}</span><small>{plan.price.toLocaleString("mn-MN")}₮ / {days} хоног</small>
+              </button>
+            ))}
+          </div>
           <div className="plan-price">
-            <b>{price.toLocaleString("mn-MN")}₮</b>
+            <b>{(plans.find((plan) => plan.id === selectedPlan)?.price ?? 0).toLocaleString("mn-MN")}₮</b>
             <span>/ {days} хоног</span>
           </div>
           <button
-            className="primary-button"
+            className="primary-button qpay-pay-button"
             onClick={createInvoice}
             disabled={loading}
           >
@@ -98,10 +124,13 @@ export function QPayCheckout({ price, days }: { price: number; days: number }) {
           <div className="qpay-banks">
             {payment.urls.map((bank) => (
               <a key={`${bank.name}-${bank.link}`} href={bank.link}>
-                {bank.name}
+                {bank.logo && <img src={bank.logo} alt="" />}
+                <span>{bank.name}</span>
               </a>
             ))}
           </div>
+          <button className="qpay-check-button" type="button" onClick={checkPayment} disabled={loading}>{loading ? "Шалгаж байна…" : "Төлбөр шалгах"}</button>
+          {error && <p className="qpay-error">{error}</p>}
           <p className="qpay-waiting">
             <span /> Төлбөр хүлээж байна…
           </p>

@@ -26,7 +26,15 @@ type ShakaInstance = {
   selectVariantTrack: (track: QualityTrack, clearBuffer?: boolean) => void;
   addEventListener: (type: string, listener: (event: Event) => void) => void;
 };
+type MpegTsInstance = {
+  destroy: () => void;
+  attachMediaElement: (element: HTMLMediaElement) => void;
+  load: () => void;
+  play: () => Promise<void> | void;
+  on: (event: string, listener: (...args: unknown[]) => void) => void;
+};
 type SubtitleCue = { start: number; end: number; text: string };
+const LIVE_HEARTBEAT_INTERVAL_MS = 15_000;
 const parseCueTime = (value: string) => {
   const parts = value.trim().replace(",", ".").split(":").map(Number);
   if (parts.some((part) => !Number.isFinite(part))) return Number.NaN;
@@ -79,6 +87,7 @@ export function PlayerShell({
     undefined,
   );
   const viewRecordedRef = useRef(false);
+  const liveSessionRef = useRef<string | undefined>(undefined);
   const preferencesLoadedRef = useRef(false);
   const seekFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const gestureHoldTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -112,6 +121,7 @@ export function PlayerShell({
   const [speedHolding, setSpeedHolding] = useState(false);
   const [subtitleCues, setSubtitleCues] = useState<SubtitleCue[]>([]);
   const [visibleSubtitle, setVisibleSubtitle] = useState("");
+  const [wirelessPlayback, setWirelessPlayback] = useState(false);
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem("khuree-player-preferences") ?? "{}") as { subtitleEnabled?: boolean; subtitleSize?: number; subtitleColor?: string; subtitlePosition?: string };
@@ -138,13 +148,58 @@ export function PlayerShell({
     video.setAttribute("playsinline", "true");
     video.setAttribute("webkit-playsinline", "true");
     video.setAttribute("x-webkit-airplay", "allow");
+    const wirelessChanged = () => setWirelessPlayback(Boolean((video as HTMLVideoElement & { webkitCurrentPlaybackTargetIsWireless?: boolean }).webkitCurrentPlaybackTargetIsWireless));
+    video.addEventListener("webkitcurrentplaybacktargetiswirelesschanged", wirelessChanged);
+    return () => video.removeEventListener("webkitcurrentplaybacktargetiswirelesschanged", wirelessChanged);
   }, []);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    Array.from(video.textTracks).forEach((track, index) => {
+      const selected = subtitles[index]?.id === activeSubtitle;
+      track.mode = selected ? (wirelessPlayback ? "showing" : "hidden") : "disabled";
+    });
+  }, [activeSubtitle, subtitles, wirelessPlayback]);
   useEffect(() => {
     if (!inlineFullscreen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = previousOverflow; };
   }, [inlineFullscreen]);
+  useEffect(() => {
+    if (!movieId || !playing) return;
+
+    if (!liveSessionRef.current) {
+      const saved = sessionStorage.getItem("khuree-live-movie-session");
+      liveSessionRef.current = saved && /^[0-9a-f-]{36}$/i.test(saved) ? saved : crypto.randomUUID();
+      sessionStorage.setItem("khuree-live-movie-session", liveSessionRef.current);
+    }
+    const sessionId = liveSessionRef.current;
+    const send = (method: "POST" | "DELETE") => {
+      void fetch("/api/analytics/live", {
+        method,
+        cache: "no-store",
+        keepalive: true,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ movieId, sessionId }),
+      });
+    };
+    const visibilityChanged = () => send(document.visibilityState === "visible" ? "POST" : "DELETE");
+    const pageHidden = () => send("DELETE");
+
+    send("POST");
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") send("POST");
+    }, LIVE_HEARTBEAT_INTERVAL_MS);
+    document.addEventListener("visibilitychange", visibilityChanged);
+    window.addEventListener("pagehide", pageHidden);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", visibilityChanged);
+      window.removeEventListener("pagehide", pageHidden);
+      send("DELETE");
+    };
+  }, [movieId, playing]);
   useEffect(() => () => {
     if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
     if (gestureHoldTimerRef.current) clearTimeout(gestureHoldTimerRef.current);
@@ -153,6 +208,7 @@ export function PlayerShell({
   }, []);
   useEffect(() => {
     let player: ShakaInstance | undefined;
+    let tsPlayer: MpegTsInstance | undefined;
     let cancelled = false;
     async function boot() {
       if (!manifestUrl || !videoRef.current) return;
@@ -169,11 +225,38 @@ export function PlayerShell({
         }
         setState("Тоглуулахад бэлэн");
       };
-      // Uploaded MP4 and MPEG-TS files are most reliable through the browser's native
-      // decoder, especially on iOS Safari over a LAN IP address.
-      if (/\.(?:mp4|ts)(?:$|\?)/i.test(manifestUrl)) {
+      if (/\.mp4(?:$|\?)/i.test(manifestUrl)) {
         loadNative();
         return;
+      }
+      if (/\.ts(?:$|\?)/i.test(manifestUrl)) {
+        try {
+          const mpegts = (await import("mpegts.js")).default;
+          if (!mpegts.isSupported()) {
+            loadNative();
+            return;
+          }
+          const instance = mpegts.createPlayer(
+            { type: "mpegts", isLive: false, url: manifestUrl },
+            { enableWorker: true, lazyLoad: true, lazyLoadMaxDuration: 180, seekType: "range" },
+          ) as unknown as MpegTsInstance;
+          tsPlayer = instance;
+          instance.attachMediaElement(videoRef.current);
+          instance.on(mpegts.Events.ERROR, () => {
+            if (!cancelled) setError("TS видеог тоглуулахад алдаа гарлаа. Бүх төхөөрөмжид ажиллуулахын тулд H.264 видео, AAC аудио ашиглана уу.");
+          });
+          instance.load();
+          if (autoPlay) {
+            videoRef.current.muted = true;
+            setMuted(true);
+            await Promise.resolve(instance.play()).catch(() => {});
+          }
+          if (!cancelled) setState("TS видео тоглуулахад бэлэн");
+          return;
+        } catch {
+          if (!cancelled) loadNative();
+          return;
+        }
       }
       try {
         const shaka = await import("shaka-player");
@@ -272,6 +355,7 @@ export function PlayerShell({
       cancelled = true;
       playerRef.current = undefined;
       void player?.destroy();
+      tsPlayer?.destroy();
     };
   }, [manifestUrl, autoPlay]);
   useEffect(() => {
@@ -280,7 +364,7 @@ export function PlayerShell({
     setVisibleSubtitle("");
     setSubtitleCues([]);
     if (!selected) return () => controller.abort();
-    void fetch(`/api/subtitles/${selected.key}`, { cache: "no-store", credentials: "same-origin", signal: controller.signal })
+    void fetch(`/api/subtitles/${selected.key}`, { credentials: "same-origin", signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error(`Subtitle ${response.status}`);
         return response.text();
@@ -404,6 +488,7 @@ export function PlayerShell({
     }) | null;
     if (!video) return;
     if (typeof video.webkitShowPlaybackTargetPicker === "function") {
+      Array.from(video.textTracks).forEach((track, index) => { track.mode = subtitles[index]?.id === activeSubtitle ? "showing" : "disabled"; });
       video.webkitShowPlaybackTargetPicker();
       return;
     }
@@ -497,8 +582,11 @@ export function PlayerShell({
         autoPlay={autoPlay}
         muted={autoPlay}
         playsInline
-        preload="metadata"
+        crossOrigin="anonymous"
+        preload="auto"
         controlsList="nodownload"
+        disablePictureInPicture
+        disableRemotePlayback
         onClick={togglePlay}
         onDoubleClick={toggleFullscreen}
         onWaiting={() => setBuffering(true)}
@@ -512,8 +600,10 @@ export function PlayerShell({
           if (mediaError)
             setError(
               mediaError.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
-                ? "Энэ видеоны формат утасны browser-т дэмжигдэхгүй байна. MP4 H.264 хэлбэрээр хөрвүүлнэ үү."
-                : "Видео ачаалж чадсангүй. Дахин оролдоно уу.",
+                ? "Видео эх сурвалжийг ачаалж чадсангүй. Сүлжээгээ шалгаад дахин оролдоно уу. Хэрэв давтагдвал файлын форматыг админ шалгана."
+                : mediaError.code === MediaError.MEDIA_ERR_NETWORK
+                  ? "Видео татах үед сүлжээ тасалдлаа. Дахин оролдоно уу."
+                  : "Видео ачаалж чадсангүй. Дахин оролдоно уу.",
             );
         }}
         onPlay={() => {
@@ -548,8 +638,10 @@ export function PlayerShell({
           setMuted(event.currentTarget.muted);
         }}
         aria-label={`${title} видео тоглуулагч`}
-      />
-      {visibleSubtitle && <div className="custom-subtitle" style={{ top: `${subtitlePosition}%` }} aria-live="off">{visibleSubtitle}</div>}
+      >
+        {subtitles.map((track) => track.sourceUrl ? <track key={track.id} kind="subtitles" src={track.sourceUrl} srcLang={track.language} label={track.label} /> : null)}
+      </video>
+      {!wirelessPlayback && visibleSubtitle && <div className="custom-subtitle" style={{ top: `${subtitlePosition}%` }} aria-live="off">{visibleSubtitle}</div>}
       <div className="mobile-gesture-layer" onPointerDown={gesturePointerDown} onPointerUp={(event) => finishGesture(event)} onPointerCancel={(event) => finishGesture(event, true)} />
       {seekFeedback && <div className={`tap-feedback ${seekFeedback < 0 ? "left" : "right"}`}><b>{seekFeedback > 0 ? "+10" : "−10"}</b><span>секунд</span></div>}
       {speedHolding && <div className="speed-feedback"><b>2×</b><span>Хурдасгаж байна</span></div>}
@@ -587,13 +679,13 @@ export function PlayerShell({
         </div>
       )}
       <div className="player-brand">ХҮРЭЭ</div>
-      {!playing && controlsVisible && !buffering && !error && manifestUrl && (
+      {controlsVisible && !buffering && !error && manifestUrl && (
         <button
-          className="center-play paused-only"
+          className={`center-play paused-only ${playing ? "playing" : "paused"}`}
           onClick={togglePlay}
-          aria-label="Тоглуулах"
+          aria-label={playing ? "Түр зогсоох" : "Тоглуулах"}
         >
-          <span className="play-symbol" />
+          {playing ? <span className="pause-symbol" /> : <span className="play-symbol" />}
         </button>
       )}
       <div className="player-shade" />

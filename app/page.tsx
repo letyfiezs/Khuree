@@ -4,16 +4,18 @@ import { getBrowseCatalog } from "@/lib/catalog";
 import { HomeRail } from "@/components/home-rail";
 import { popularMovieIds } from "@/lib/popular";
 import { RecentlyWatched } from "@/components/recently-watched";
+import { isVerticalDrama } from "@/lib/vertical-drama";
+import { LiveNowTopFive } from "@/components/live-now-top-five";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const allItems = await getBrowseCatalog();
+  const [allItems, popularIds] = await Promise.all([getBrowseCatalog(), popularMovieIds()]);
   const items = allItems.filter((item) => item.age !== "18+");
-  const movies = items.filter((item) => item.kind === "movie");
+  const verticalDramas = items.filter(isVerticalDrama);
   const series = items.filter((item) => item.kind === "series");
+  const movies = items.filter((item) => item.kind === "movie" && !isVerticalDrama(item));
   const adult = allItems.filter((item) => item.age === "18+");
-  const popularIds = await popularMovieIds();
   const popular = [...items].sort((a,b) => {
     const ai=popularIds.indexOf(a.id), bi=popularIds.indexOf(b.id);
     return (ai<0?Number.MAX_SAFE_INTEGER:ai)-(bi<0?Number.MAX_SAFE_INTEGER:bi);
@@ -76,11 +78,13 @@ export default async function Home() {
         </section>
       )}
       <RecentlyWatched />
+      <LiveNowTopFive />
       <HomeRail kicker="ОДОО ҮЗЭХ" title="Шинээр нэмэгдсэн" href="/movies" items={items} />
-      <HomeRail kicker="ТӨЛБӨРГҮЙ ҮЗЭХ" title="Үнэгүй" href="/movies" items={movies} />
-      <HomeRail kicker="ҮЗЭГЧДИЙН СОНГОЛТ" title="Их үзэлттэй" href="/movies" items={popular} />
+      <HomeRail kicker="БҮРЭН ХЭМЖЭЭНИЙ" title="Кино" href="/movies" items={movies} />
+      <HomeRail kicker="БОСООГООР ҮЗЭХ" title="Босоо драма" href="/vertical" items={verticalDramas} />
       <HomeRail kicker="АНГИ БҮР ШИНЭ ТҮҮХ" title="Олон ангит" href="/series" items={series} />
-      <HomeRail kicker="НАСАНД ХҮРЭГЧДЭД" title="+18" href="/adult" items={adult} />
+      <HomeRail kicker="ҮЗЭГЧДИЙН СОНГОЛТ" title="Их үзэлттэй" href="/movies" items={popular} />
+      <HomeRail kicker="НАСАНД ХҮРЭГЧДЭД" title="+18" href="/adult" items={adult} blurPosters />
     </main>
   );
 }

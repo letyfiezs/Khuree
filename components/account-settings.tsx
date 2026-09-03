@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { LocalUser } from "@/lib/auth/local-auth";
+import { MyDevices } from "./my-devices";
 export function AccountSettings({ user }: { user: LocalUser }) {
   const [name, setName] = useState(user.name);
   const [adultEnabled, setAdultEnabled] = useState(user.adultEnabled);
@@ -35,7 +36,7 @@ export function AccountSettings({ user }: { user: LocalUser }) {
     }
   }
   return (
-    <form className="account-card" onSubmit={save}>
+    <div className="account-settings-stack"><form className="account-card" onSubmit={save}>
       <p className="section-kicker">ACCOUNT SETTINGS</p>
       <h1>Миний бүртгэл</h1>
       <label>
@@ -74,11 +75,14 @@ export function AccountSettings({ user }: { user: LocalUser }) {
         </label>
       )}
       <label>
-        Баталгаажуулах одоогийн нууц үг
+        {user.loginKind ? "Баталгаажуулах 4 оронтой нэвтрэх PIN" : "Баталгаажуулах одоогийн нууц үг"}
         <input
           value={password}
-          onChange={(event) => setPassword(event.target.value)}
+          onChange={(event) => setPassword(user.loginKind ? event.target.value.replace(/\D/g, "").slice(0, 4) : event.target.value)}
           type="password"
+          inputMode={user.loginKind ? "numeric" : undefined}
+          autoComplete="current-password"
+          placeholder={user.loginKind ? "••••" : undefined}
           required
         />
       </label>
@@ -86,6 +90,6 @@ export function AccountSettings({ user }: { user: LocalUser }) {
       <button className="primary-button" disabled={saving}>
         {saving ? "Хадгалж байна…" : "Тохиргоо хадгалах"}
       </button>
-    </form>
+    </form><MyDevices /></div>
   );
 }

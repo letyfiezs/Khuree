@@ -1,4 +1,6 @@
 export type ContentKind = "movie" | "series";
+export type AudioLabel = "Субтай" | "Хэлтэй";
+export const audioLabels: AudioLabel[] = ["Субтай", "Хэлтэй"];
 import type { SubtitleTrack } from "./storage/types";
 export type ContentItem = {
   id: string;
@@ -15,6 +17,7 @@ export type ContentItem = {
   accent: string;
   episodes?: number;
   videoKey?: string;
+  videoBytes?: number;
   subtitles?: SubtitleTrack[];
   posterUrl?: string;
   backdropUrl?: string;
@@ -27,6 +30,7 @@ export type ContentItem = {
   seasonId?: string;
   seasonNumber?: number;
   episodeNumber?: number;
+  audioLabel?: AudioLabel;
 };
 export const content: ContentItem[] = [];
 export const getContent = (slug: string) =>

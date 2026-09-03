@@ -1,6 +1,8 @@
 import "server-only";
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import type { ContentItem } from "@/lib/content";
-import { listMovies } from "@/lib/movies";
+import { listPublicMovies } from "@/lib/movies";
 import { getSeriesShow, listSeriesSeasons, listSeriesShows } from "@/lib/series-admin";
 
 function seriesCard(show: Awaited<ReturnType<typeof listSeriesShows>>[number], episodes: ContentItem[]): ContentItem | undefined {
@@ -28,18 +30,19 @@ function seriesCard(show: Awaited<ReturnType<typeof listSeriesShows>>[number], e
   };
 }
 
-export async function listPublicSeries() {
-  const [shows, movies] = await Promise.all([listSeriesShows(), listMovies()]);
+const listPublicSeriesCached = unstable_cache(async function listPublicSeries() {
+  const [shows, movies] = await Promise.all([listSeriesShows(), listPublicMovies()]);
   return shows
     .map((show) => seriesCard(show, movies.filter((movie) => movie.kind === "series" && movie.seriesId === show.id && movie.status === "published")))
     .filter((show): show is ContentItem => Boolean(show));
-}
+}, ["khuree-public-series-v1"], { revalidate: 30, tags: ["catalog", "series"] });
+export const listPublicSeries = cache(listPublicSeriesCached);
 
 export async function getPublicSeries(id: string) {
   const [show, seasons, movies] = await Promise.all([
     getSeriesShow(id),
     listSeriesSeasons(id),
-    listMovies(),
+    listPublicMovies(),
   ]);
   if (!show) return undefined;
   const episodes = movies

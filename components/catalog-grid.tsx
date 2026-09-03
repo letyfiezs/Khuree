@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ContentItem } from "@/lib/content";
+import { ResilientPoster } from "@/components/resilient-poster";
 export function CatalogGrid({ items }: { items: ContentItem[] }) {
   return (
     <div className="catalog-grid">
@@ -8,12 +9,11 @@ export function CatalogGrid({ items }: { items: ContentItem[] }) {
           <div
             className={`poster ${item.posterUrl ? "has-poster" : ""}`}
             style={{
-              background: item.posterUrl
-                ? `linear-gradient(0deg,#000b,transparent 52%),url(${item.posterUrl}) center/cover`
-                : `radial-gradient(circle at 55% 25%,${item.accent}cc,transparent 40%),linear-gradient(155deg,${item.accent},#050505)`,
+              background: `radial-gradient(circle at 55% 25%,${item.accent}cc,transparent 40%),linear-gradient(155deg,${item.accent},#050505)`,
             }}
           >
-            <span className="poster-mark">ХҮРЭЭ</span>
+            {item.posterUrl && <ResilientPoster src={item.posterUrl} alt={item.title} />}
+            {item.audioLabel && <span className="audio-tag">{item.audioLabel === "Хэлтэй" ? "ХЭЛ" : "SUB"}</span>}
             {!item.posterUrl && (
               <span className="poster-title">{item.title}</span>
             )}

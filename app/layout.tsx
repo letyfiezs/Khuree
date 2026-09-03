@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { PwaRegister } from "@/components/pwa-register";
 import { InstallApp } from "@/components/install-app";
+import { DeviceGate } from "@/components/device-gate";
+import { ClientProtection } from "@/components/client-protection";
+import { PresenceHeartbeat } from "@/components/presence-heartbeat";
 import "./globals.css";
 import "./extended.css";
 import "./upload.css";
@@ -59,8 +62,14 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="mn">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__khureeInstallPrompt=event;window.dispatchEvent(new Event("khureeinstallready"));});window.addEventListener("appinstalled",function(){window.__khureeInstallPrompt=null;});` }} />
+      </head>
       <body className={geist.variable}>
         {children}
+        <DeviceGate />
+        <PresenceHeartbeat />
+        <ClientProtection />
         <InstallApp />
         <PwaRegister />
       </body>

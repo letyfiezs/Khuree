@@ -1,8 +1,8 @@
 import { content, type ContentItem, type ContentKind } from "./content";
-import { getMovieBySlug, listMovies } from "./movies";
+import { getMovieBySlug, listPublicMovies } from "./movies";
 import { listPublicSeries } from "./public-series";
 export async function getCatalog(kind?: ContentKind) {
-  const databaseItems = (await listMovies()).filter((item) => item.status === "published");
+  const databaseItems = await listPublicMovies();
   const all = [...databaseItems, ...content.filter((item) => item.status === "published")];
   return kind ? all.filter((item) => item.kind === kind) : all;
 }
