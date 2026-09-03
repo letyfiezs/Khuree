@@ -2,6 +2,21 @@ import nodemailer from "nodemailer";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+function escapeHtml(value: string) { return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character] ?? character); }
+
+export async function sendAdminMessageEmail(email: string, name: string, message: string) {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) return false;
+  const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT ?? 587), secure: process.env.SMTP_SECURE === "true", auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM ?? process.env.SMTP_USER,
+    to: email,
+    subject: "Хүрээ — Танд шинэ зурвас ирлээ",
+    text: `Сайн байна уу, ${name}.\n\nХүрээ админаас: ${message}\n\nХариу бичих: ${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.huree.site")}/`,
+    html: `<div style="font-family:Arial,sans-serif;background:#090909;color:#fff;padding:32px"><h1 style="color:#e50914">ХҮРЭЭ</h1><p>Сайн байна уу, ${escapeHtml(name)}.</p><p>Танд админаас шинэ зурвас ирлээ:</p><blockquote style="margin:20px 0;padding:16px;border-left:3px solid #e50914;background:#161616;color:#eee;white-space:pre-wrap">${escapeHtml(message)}</blockquote><a href="${process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.huree.site"}" style="display:inline-block;background:#e50914;color:#fff;padding:13px 20px;text-decoration:none;border-radius:5px">Хариу бичих</a></div>`,
+  });
+  return true;
+}
+
 export async function sendVerificationEmail(
   email: string,
   name: string,

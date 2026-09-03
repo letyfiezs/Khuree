@@ -1,6 +1,7 @@
 import { apiAdmin } from "@/lib/admin";
 import { createSupabaseAdminClient } from "@/lib/supabase";
 import { setUserEntitlement } from "@/lib/user-entitlements";
+import { authEmail, pinPassword } from "@/lib/auth/pin-auth";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -8,7 +9,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!(await apiAdmin())) return Response.json({ error: "Админ эрх шаардлагатай." }, { status: 403 });
   const { id } = await params;
   if (!uuid.test(id)) return Response.json({ error: "Хэрэглэгчийн ID буруу." }, { status: 400 });
-  const body = await request.json() as { action?: unknown; days?: unknown; permission?: unknown; allowed?: unknown; deviceId?: unknown };
+  const body = await request.json() as { action?: unknown; days?: unknown; permission?: unknown; allowed?: unknown; deviceId?: unknown; password?: unknown };
+  if (body.action === "reset_password") {
+    if (typeof body.password !== "string") return Response.json({ error: "Шинэ нууц үг оруулна уу." }, { status: 400 });
+    const client = createSupabaseAdminClient();
+    const { data: targetProfile } = await client.from("profiles").select("role").eq("id", id).maybeSingle();
+    if (targetProfile?.role === "admin") return Response.json({ error: "Админы нууц үгийг энэ хэсгээс шинэчлэх боломжгүй." }, { status: 400 });
+    const { data, error } = await client.auth.admin.getUserById(id);
+    if (error || !data.user) return Response.json({ error: "Хэрэглэгч олдсонгүй." }, { status: 404 });
+    const isPhone = data.user.user_metadata?.login_kind === "phone" || data.user.email?.endsWith("@khuree.local");
+    if (isPhone && !/^\d{4}$/.test(body.password)) return Response.json({ error: "Утасны хэрэглэгчийн шинэ PIN 4 оронтой байна." }, { status: 400 });
+    if (!isPhone && body.password.length < 8) return Response.json({ error: "Нууц үг 8-аас дээш тэмдэгттэй байна." }, { status: 400 });
+    const password = isPhone ? pinPassword(data.user.user_metadata?.phone || data.user.phone || "", body.password) : body.password;
+    const updated = await client.auth.admin.updateUserById(id, { password });
+    if (updated.error) return Response.json({ error: "Нууц үг шинэчилж чадсангүй." }, { status: 500 });
+    return Response.json({ ok: true });
+  }
   if (body.action === "grant" || body.action === "revoke") {
     const days = Number(body.days);
     if (body.action === "grant" && (!Number.isInteger(days) || days < 1 || days > 3650)) return Response.json({ error: "Эрхийн хоног 1–3650 байна." }, { status: 400 });

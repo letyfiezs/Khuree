@@ -5,6 +5,7 @@ import { InstallApp } from "@/components/install-app";
 import { DeviceGate } from "@/components/device-gate";
 import { ClientProtection } from "@/components/client-protection";
 import { PresenceHeartbeat } from "@/components/presence-heartbeat";
+import { FeedbackChat } from "@/components/feedback-chat";
 import "./globals.css";
 import "./extended.css";
 import "./upload.css";
@@ -16,6 +17,7 @@ import "./live-desktop.css";
 import "./player-autohide.css";
 import "./admin-actions.css";
 import "./mobile-fixes.css";
+import "./messages.css";
 
 const geist = Geist({
   variable: "--font-geist",
@@ -70,6 +72,7 @@ export default function RootLayout({
         <DeviceGate />
         <PresenceHeartbeat />
         <ClientProtection />
+        <FeedbackChat />
         <InstallApp />
         <PwaRegister />
       </body>

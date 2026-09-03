@@ -7,6 +7,7 @@ export type AdminUserItem = {
   name: string;
   email: string;
   phone: string;
+  loginKind: "phone" | "email";
   role: "user" | "admin";
   watchPermissions: { movie: boolean; series: boolean; vertical: boolean; adult: boolean };
   createdAt: string;
@@ -59,6 +60,7 @@ export async function listAdminUsers(): Promise<AdminUserItem[]> {
       name: profile?.display_name || user.user_metadata?.name || phone || email || "Хэрэглэгч",
       email,
       phone,
+      loginKind: loginKind === "phone" || user.email?.endsWith("@khuree.local") ? "phone" : "email",
       role: profile?.role === "admin" ? "admin" : "user",
       watchPermissions: {
         movie: (permissions?.movie ?? true) && (planActive("vip") || planActive("movie") || legacyActive),
