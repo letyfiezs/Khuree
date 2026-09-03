@@ -586,7 +586,6 @@ export function PlayerShell({
         preload="auto"
         controlsList="nodownload"
         disablePictureInPicture
-        disableRemotePlayback
         onClick={togglePlay}
         onDoubleClick={toggleFullscreen}
         onWaiting={() => setBuffering(true)}
