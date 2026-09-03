@@ -1,5 +1,4 @@
 import { apiAdmin } from "@/lib/admin";
-import { sendAdminMessageEmail } from "@/lib/auth/mailer";
 import { createSupabaseAdminClient } from "@/lib/supabase";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -34,7 +33,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!user) return Response.json({ error: "Хэрэглэгч олдсонгүй." }, { status: 404 });
   const { data, error } = await db.from("user_messages").insert({ user_id: id, sender_role: "admin", body: message }).select(selectFields).single();
   if (error || !data) return Response.json({ error: "Зурвас илгээж чадсангүй." }, { status: 500 });
-  const email = user.email?.endsWith("@khuree.local") ? "" : user.email;
-  if (email) await sendAdminMessageEmail(email, user.user_metadata?.name || email.split("@")[0], message).catch((cause) => console.error("Message email failed:", cause instanceof Error ? cause.message : "unknown error"));
   return Response.json({ message: data }, { status: 201 });
 }

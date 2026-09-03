@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { LocalUser } from "@/lib/auth/local-auth";
 import { LogoutButton } from "./logout-button";
+import { AdminChatLink } from "./admin-chat-link";
 export function AdminShell({
   user,
   children,
@@ -60,6 +61,7 @@ export function AdminShell({
           >
             ◉ <span>Хэрэглэгчид</span>
           </Link>
+          <AdminChatLink active={active === "chat"} />
           <Link href="/movies">
             ◉ <span>Нийтийн каталог</span>
           </Link>

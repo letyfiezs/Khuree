@@ -18,6 +18,9 @@ import "./player-autohide.css";
 import "./admin-actions.css";
 import "./mobile-fixes.css";
 import "./messages.css";
+import "./messages-notifications.css";
+import "./admin-chat.css";
+import "./admin-chat-badge.css";
 
 const geist = Geist({
   variable: "--font-geist",
