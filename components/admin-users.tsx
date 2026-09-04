@@ -15,7 +15,8 @@ const remainingDays = (value?: string) => value ? Math.max(1, Math.ceil((new Dat
 const planNames: Record<string, string> = { movie: "Кино", series: "Олон ангит", vertical: "Босоо драма", adult: "+18", vip: "VIP" };
 const ONLINE_WINDOW_MS = 3 * 60_000;
 const PRESENCE_REFRESH_INTERVAL_MS = 15_000;
-type UserFilter = "all" | "vip" | "packages" | "none";
+const USERS_PER_PAGE = 15;
+type UserFilter = "all" | "vip" | "packages" | "none" | "online" | "offline";
 type ChatMessage = { id: string; sender_role: "user" | "admin"; body: string; created_at: string };
 const money = new Intl.NumberFormat("mn-MN");
 
@@ -23,6 +24,7 @@ export function AdminUsers({ initial }: { initial: AdminUserItem[] }) {
   const [users, setUsers] = useState(initial);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<UserFilter>("all");
+  const [page, setPage] = useState(1);
   const [saving, setSaving] = useState<string>();
   const [error, setError] = useState("");
   const [accessUser, setAccessUser] = useState<AdminUserItem>();
@@ -62,11 +64,16 @@ export function AdminUsers({ initial }: { initial: AdminUserItem[] }) {
   const visible = useMemo(() => {
     const value = query.trim().toLocaleLowerCase("mn");
     return users.filter((user) => {
-      const matchesFilter = filter === "all" || (filter === "vip" ? user.qpayPaidPlans.includes("vip") : filter === "packages" ? !user.qpayPaidPlans.includes("vip") && user.qpayPaidCount > 0 : user.qpayPaidCount === 0);
+      const online = Boolean(user.lastSeenAt && checkedAt - new Date(user.lastSeenAt).getTime() < ONLINE_WINDOW_MS);
+      const matchesFilter = filter === "all" || (filter === "vip" ? user.qpayPaidPlans.includes("vip") : filter === "packages" ? !user.qpayPaidPlans.includes("vip") && user.qpayPaidCount > 0 : filter === "none" ? user.qpayPaidCount === 0 : filter === "online" ? online : !online);
       const matchesQuery = !value || [user.name, user.phone, user.email, user.watching?.title ?? ""].some((field) => field.toLocaleLowerCase("mn").includes(value));
       return matchesFilter && matchesQuery;
     });
-  }, [filter, query, users]);
+  }, [checkedAt, filter, query, users]);
+  const totalPages = Math.max(1, Math.ceil(visible.length / USERS_PER_PAGE));
+  const pagedUsers = useMemo(() => visible.slice((page - 1) * USERS_PER_PAGE, page * USERS_PER_PAGE), [page, visible]);
+  useEffect(() => setPage(1), [filter, query]);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
   const paymentSummary = useMemo(() => ({
     total: users.reduce((sum, user) => sum + user.qpayPaidAmount, 0),
     count: users.reduce((sum, user) => sum + user.qpayPaidCount, 0),
@@ -143,11 +150,11 @@ export function AdminUsers({ initial }: { initial: AdminUserItem[] }) {
       <div className="admin-payment-summary"><small>QPAY ОРЛОГО</small><strong>₮{money.format(paymentSummary.total)}</strong><span>{paymentSummary.count} төлөлт · Гараар олгосон эрх ороогүй</span></div>
       <label className="user-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Нэр, утас, имэйлээр хайх" /></label>
     </div>
-    <div className="user-filter-tabs" role="tablist" aria-label="Хэрэглэгчийн ангилал">{([ ["all", `Бүгд · ${users.length}`], ["vip", `Бүтэн VIP · ${paymentSummary.vip}`], ["packages", `1–3 багц · ${paymentSummary.packages}`], ["none", `Эрх аваагүй · ${paymentSummary.none}`] ] as [UserFilter, string][]).map(([value, label]) => <button key={value} className={filter === value ? "active" : ""} onClick={() => setFilter(value)}>{label}</button>)}</div>
+    <div className="user-filter-tabs" role="tablist" aria-label="Хэрэглэгчийн ангилал">{([ ["all", `Бүгд · ${users.length}`], ["vip", `Бүтэн VIP · ${paymentSummary.vip}`], ["packages", `1–3 багц · ${paymentSummary.packages}`], ["none", `Эрх аваагүй · ${paymentSummary.none}`], ["online", `Онлайн · ${users.filter((user) => user.lastSeenAt && checkedAt - new Date(user.lastSeenAt).getTime() < ONLINE_WINDOW_MS).length}`], ["offline", `Офлайн · ${users.filter((user) => !user.lastSeenAt || checkedAt - new Date(user.lastSeenAt).getTime() >= ONLINE_WINDOW_MS).length}`] ] as [UserFilter, string][]).map(([value, label]) => <button key={value} className={filter === value ? "active" : ""} onClick={() => setFilter(value)}>{label}</button>)}</div>
     {error && <p className="form-error">⚠ {error}</p>}
     <div className="admin-table users-table">
       <div className="table-head"><span>ХЭРЭГЛЭГЧ</span><span>ТӨЛӨВ</span><span>ИДЭВХ</span><span>ЕРӨНХИЙ ЭРХ</span><span>ҮЗЭХ ЗӨВШӨӨРӨЛ</span><span>ҮЙЛДЭЛ</span></div>
-      {visible.map((user) => { const created = formatDateTime(user.createdAt); const lastSignIn = formatDateTime(user.lastSignInAt); const lastSeen = formatDateTime(user.lastSeenAt); const online = Boolean(user.lastSeenAt && checkedAt - new Date(user.lastSeenAt).getTime() < ONLINE_WINDOW_MS); return <div className="table-row" key={user.id}>
+      {pagedUsers.map((user) => { const created = formatDateTime(user.createdAt); const lastSignIn = formatDateTime(user.lastSignInAt); const lastSeen = formatDateTime(user.lastSeenAt); const online = Boolean(user.lastSeenAt && checkedAt - new Date(user.lastSeenAt).getTime() < ONLINE_WINDOW_MS); return <div className="table-row" key={user.id}>
         <div className="title-cell user-identity"><i className={online ? "user-online-avatar" : ""}>{user.name.slice(0, 1).toUpperCase()}</i><span><b>{user.name}</b><small>{user.phone || user.email || "Холбоо барих мэдээлэлгүй"}</small><em>{user.qpayPaidPlans.includes("vip") ? "QPAY VIP" : user.qpayPaidCount ? "QPAY БАГЦ" : "ЭРХ АВААГҮЙ"}</em></span></div>
         <span className={`presence-status ${online ? "online" : "offline"}`}><b><i />{online ? "Онлайн" : "Офлайн"}</b><small>{user.watching ? "Одоо үзэж байна" : online ? "Яг одоо сайтад байна" : user.lastSeenAt ? `${lastSeen.date} · ${lastSeen.time}` : "Одоогоор мэдээлэлгүй"}</small>{user.watching && <em className="watching-title">{user.watching.title}</em>}</span>
         <span className="user-activity"><b>Сүүлд нэвтэрсэн</b><span>{lastSignIn.date} · {lastSignIn.time}</span><small>Бүртгүүлсэн: {created.date}</small></span>
@@ -157,6 +164,7 @@ export function AdminUsers({ initial }: { initial: AdminUserItem[] }) {
       </div>})}
       {!visible.length && <p className="empty-catalog">Хэрэглэгч олдсонгүй.</p>}
     </div>
+    {visible.length > USERS_PER_PAGE && <nav className="user-pagination" aria-label="Хэрэглэгчийн хуудас"><button disabled={page === 1} onClick={() => setPage((current) => current - 1)}>‹</button>{Array.from({ length: totalPages }, (_, index) => index + 1).map((number) => <button key={number} className={page === number ? "active" : ""} aria-current={page === number ? "page" : undefined} onClick={() => setPage(number)}>{number}</button>)}<button disabled={page === totalPages} onClick={() => setPage((current) => current + 1)}>›</button></nav>}
     {accessUser && <div className="device-modal-backdrop access-modal-backdrop"><section className="device-modal access-modal"><button className="access-modal-close" aria-label="Хаах" onClick={() => setAccessUser(undefined)}>×</button><div className="access-modal-heading"><i>◇</i><div><p className="section-kicker">НЭГДСЭН ЭРХИЙН УДИРДЛАГА</p><h2>{accessUser.name}</h2></div></div><p>QPay болон гараар олгосон бүх эрхийг нэг дороос удирдана. Хугацааг өөрчилбөл тухайн хэрэглэгчийн эрх шууд шинэчлэгдэнэ.</p><div className={`access-status-card ${accessUser.accessEnabled ? "enabled" : "disabled"}`}><div><span><i />{accessUser.accessEnabled ? "ЭРХ ИДЭВХТЭЙ" : "ЭРХ ХААЛТТАЙ"}</span><b>{accessUser.activePlans.length ? accessUser.activePlans.map((plan) => planNames[plan] ?? plan).join(" · ") : "Гараар олгосон ерөнхий эрх"}</b></div><em>{accessUser.accessEnabled ? <><strong>{remainingDays(accessUser.accessExpiresAt)}</strong> хоног</> : "—"}</em><small>{accessUser.accessEnabled && accessUser.accessExpiresAt ? `Дуусах: ${formatDateTime(accessUser.accessExpiresAt).date}` : "Одоогоор үзэх боломжгүй"}</small></div><div className="access-days-field"><label htmlFor="access-days"><span>Өнөөдрөөс эхлэх хугацаа</span><small>1–3650 хоног</small></label><div><button type="button" onClick={() => setAccessDays((days) => Math.max(1, days - 1))}>−</button><input id="access-days" type="number" min="1" max="3650" value={accessDays} onChange={(event) => setAccessDays(Number(event.target.value))} /><b>хоног</b><button type="button" onClick={() => setAccessDays((days) => Math.min(3650, days + 1))}>＋</button></div></div><p className="access-helper"><i>i</i><span>Хадгалах үед дуусах хугацааг өнөөдрөөс шинээр тооцно. Одоогийн хугацааг өсгөж эсвэл багасгаж болно.</span></p><div className="device-modal-actions access-modal-actions"><button className="primary-button" disabled={saving === accessUser.id} onClick={() => void updateAccess("grant")}>{saving === accessUser.id ? "Хадгалж байна…" : "✓ Хугацааг хадгалж нээх"}</button><button className="danger-button" disabled={saving === accessUser.id} onClick={() => void updateAccess("revoke")}>⊘ Бүх эрхийг хаах</button></div></section></div>}
     {deleteUser && <div className="device-modal-backdrop"><section className="device-modal access-modal delete-access-modal"><button className="access-modal-close" aria-label="Хаах" onClick={() => setDeleteUser(undefined)}>×</button><p className="section-kicker">ХЭРЭГЛЭГЧ УСТГАХ</p><h2>{deleteUser.name}</h2><p>Энэ хэрэглэгчийн нэвтрэх бүртгэл болон profile мэдээлэл бүрмөсөн устна. Энэ үйлдлийг буцаах боломжгүй.</p><div className="device-summary"><b>{deleteUser.phone || deleteUser.email || deleteUser.id}</b></div><div className="device-modal-actions"><button className="danger-button" disabled={saving === deleteUser.id} onClick={() => void confirmDelete()}>{saving === deleteUser.id ? "Устгаж байна…" : "Бүрмөсөн устгах"}</button><button disabled={saving === deleteUser.id} onClick={() => setDeleteUser(undefined)}>Болих</button></div></section></div>}
     {deviceUser && <div className="device-modal-backdrop access-modal-backdrop"><section className="device-modal access-modal admin-device-manager"><button className="access-modal-close" aria-label="Хаах" onClick={() => setDeviceUser(undefined)}>×</button><p className="section-kicker">ТӨХӨӨРӨМЖИЙН УДИРДЛАГА</p><h2>{deviceUser.name}</h2><p>{deviceUser.phone || deviceUser.email} · {deviceUser.devices.length} / {deviceUser.role === "admin" ? "∞" : "3"} төхөөрөмж</p><div className="admin-device-list">{deviceUser.devices.map((device) => <article key={device.id}><i>▣</i><div><b>{device.name}</b><small>Сүүлд ашигласан: {formatDateTime(device.lastSeenAt).date} · {formatDateTime(device.lastSeenAt).time}</small></div><button disabled={saving === device.id} onClick={() => void removeDevice(device.id)}>{saving === device.id ? "Хасаж байна…" : "Хасах"}</button></article>)}{!deviceUser.devices.length && <div className="record-empty">Бүртгэлтэй төхөөрөмж байхгүй.</div>}</div></section></div>}

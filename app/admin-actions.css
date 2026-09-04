@@ -278,6 +278,11 @@
 .user-filter-tabs button { border:1px solid #29292f; border-radius:999px; padding:9px 13px; background:#111114; color:#888; font-size:9px; font-weight:800; cursor:pointer; }
 .user-filter-tabs button:hover { border-color:#ffffff35; color:#ddd; }
 .user-filter-tabs button.active { border-color:#e5091466; background:#e5091418; color:#ff8990; }
+.user-pagination { display:flex; align-items:center; justify-content:center; gap:7px; margin:18px 0 4px; }
+.user-pagination button { display:grid; place-items:center; min-width:34px; height:34px; border:1px solid #29292f; border-radius:8px; background:#111114; color:#aaa; font-size:11px; font-weight:850; cursor:pointer; }
+.user-pagination button:hover:not(:disabled) { border-color:#ffffff45; color:#fff; }
+.user-pagination button.active { border-color:#e5091470; background:#e50914; color:#fff; }
+.user-pagination button:disabled { cursor:default; opacity:.35; }
 .user-search>span { position:absolute; left:15px; top:50%; z-index:1; transform:translateY(-53%); color:#666; font-size:22px; }
 .user-admin-toolbar input {
   width: min(380px, 100%);
