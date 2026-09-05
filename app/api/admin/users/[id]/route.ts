@@ -1,7 +1,8 @@
 import { apiAdmin } from "@/lib/admin";
 import { createSupabaseAdminClient } from "@/lib/supabase";
-import { setUserEntitlement } from "@/lib/user-entitlements";
+import { correctUserQPayPlan, setUserEntitlement } from "@/lib/user-entitlements";
 import { authEmail, pinPassword } from "@/lib/auth/pin-auth";
+import { qpaySettings } from "@/lib/qpay";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -9,7 +10,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!(await apiAdmin())) return Response.json({ error: "Админ эрх шаардлагатай." }, { status: 403 });
   const { id } = await params;
   if (!uuid.test(id)) return Response.json({ error: "Хэрэглэгчийн ID буруу." }, { status: 400 });
-  const body = await request.json() as { action?: unknown; days?: unknown; permission?: unknown; allowed?: unknown; deviceId?: unknown; password?: unknown };
+  const body = await request.json() as { action?: unknown; days?: unknown; permission?: unknown; allowed?: unknown; deviceId?: unknown; password?: unknown; paymentId?: unknown; plan?: unknown };
   if (body.action === "reset_password") {
     if (typeof body.password !== "string") return Response.json({ error: "Шинэ нууц үг оруулна уу." }, { status: 400 });
     const client = createSupabaseAdminClient();
@@ -30,6 +31,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body.action === "grant" && (!Number.isInteger(days) || days < 1 || days > 3650)) return Response.json({ error: "Эрхийн хоног 1–3650 байна." }, { status: 400 });
     try { const entitlement = await setUserEntitlement(id, { enabled: body.action === "grant", days: body.action === "grant" ? days : undefined, source: "manual" }); return Response.json({ id, entitlement }); }
     catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Эрх шинэчилж чадсангүй." }, { status: 500 }); }
+  }
+  if (body.action === "correct_qpay_plan") {
+    if (typeof body.paymentId !== "string" || !body.paymentId || !(["movie", "series", "vertical", "adult", "vip"] as string[]).includes(String(body.plan)))
+      return Response.json({ error: "QPay багцын мэдээлэл буруу байна." }, { status: 400 });
+    try {
+      const correction = await correctUserQPayPlan(id, body.paymentId, body.plan as "movie" | "series" | "vertical" | "adult" | "vip", qpaySettings().days);
+      return Response.json({ id, correction });
+    } catch (error) {
+      return Response.json({ error: error instanceof Error ? error.message : "QPay багцыг засаж чадсангүй." }, { status: 500 });
+    }
   }
   if (body.action === "remove_device") {
     if (typeof body.deviceId !== "string" || !body.deviceId) return Response.json({ error: "Төхөөрөмжийн ID дутуу." }, { status: 400 });
