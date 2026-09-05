@@ -20,6 +20,11 @@ export async function PATCH(request: Request) {
       { error: "Parental PIN яг 4 оронтой байна." },
       { status: 400 },
     );
+  if (body.adultEnabled && !user.hasParentalPin && !/^\d{4}$/.test(body.parentalPin ?? ""))
+    return Response.json(
+      { error: "18+ контент идэвхжүүлэхийн тулд 4 оронтой parental PIN оруулна уу." },
+      { status: 400 },
+    );
   try {
     await updateAccount(user.id, {
       name: body.name,

@@ -69,15 +69,20 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     event.preventDefault();
     setLoading(true);
     setError("");
-    const response = await fetch(`/api/auth/pin/${mode}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind, identifier: kind === "phone" ? `+976${identifier}` : identifier.trim().toLowerCase(), pin, name: name.trim(), returnTo: returnTo ?? "" }),
-    });
-    const data = await response.json() as { error?: string; returnTo?: string };
-    setLoading(false);
-    if (!response.ok) return setError(data.error ?? "Алдаа гарлаа.");
-    window.location.href = data.returnTo ?? "/";
+    try {
+      const response = await fetch(`/api/auth/pin/${mode}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind, identifier: kind === "phone" ? `+976${identifier}` : identifier.trim().toLowerCase(), pin, name: name.trim(), returnTo: returnTo ?? "" }),
+      });
+      const data = await response.json() as { error?: string; returnTo?: string };
+      if (!response.ok) return setError(data.error ?? "Алдаа гарлаа.");
+      window.location.href = data.returnTo ?? "/";
+    } catch {
+      setError("Нэвтрэх хүсэлт амжилтгүй боллоо. Дахин оролдоно уу.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (mode === "login" && recovering) return <RecoveryForm onBack={() => setRecovering(false)} />;

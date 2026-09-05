@@ -11,6 +11,10 @@ export function AccountSettings({ user }: { user: LocalUser }) {
   const [saving, setSaving] = useState(false);
   async function save(event: React.FormEvent) {
     event.preventDefault();
+    if (adultEnabled && !user.hasParentalPin && pin.length !== 4) {
+      setMessage("⚠ 18+ контент идэвхжүүлэхийн тулд 4 оронтой parental PIN оруулна уу.");
+      return;
+    }
     setSaving(true);
     setMessage("");
     const response = await fetch("/api/account", {
@@ -71,6 +75,7 @@ export function AccountSettings({ user }: { user: LocalUser }) {
             inputMode="numeric"
             type="password"
             placeholder="••••"
+            required={!user.hasParentalPin}
           />
         </label>
       )}

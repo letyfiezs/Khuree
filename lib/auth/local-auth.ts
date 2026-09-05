@@ -100,8 +100,11 @@ export async function unlockAdultSession(_token: string | undefined, userId: str
   const admin = createSupabaseAdminClient();
   const { data } = await admin.from("profiles").select("parental_pin_hash,adult_enabled").eq("id", userId).single();
   if (!data?.adult_enabled || !data.parental_pin_hash || !safeEqual(pinHash(pin), data.parental_pin_hash)) return false;
-  await admin.from("profiles").update({ adult_unlocked_until: new Date(Date.now() + 60 * 60 * 1000).toISOString() }).eq("id", userId);
-  return true;
+  const { error } = await admin
+    .from("profiles")
+    .update({ adult_unlocked_until: new Date(Date.now() + 60 * 60 * 1000).toISOString() })
+    .eq("id", userId);
+  return !error;
 }
 export async function requireAdultAccess(user: LocalUser, returnTo: string) {
   if (!user.adultEnabled || !user.adultUnlocked) redirect(`/adult?returnTo=${encodeURIComponent(returnTo)}`);
