@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { matchesSearch } from "@/lib/search-normalize";
+import { matchesSearch, normalizeSearchText } from "@/lib/search-normalize";
 import { ResilientPoster } from "@/components/resilient-poster";
 type SearchItem = {
   id: string;
@@ -34,8 +34,17 @@ export function SearchDialog({ items }: { items: SearchItem[] }) {
   }, []);
   const results = useMemo(() => {
     if (!query.trim()) return items.slice(0, 6);
+    const normalizedQuery = normalizeSearchText(query);
+    const score = (title: string) => {
+      const normalizedTitle = normalizeSearchText(title);
+      if (normalizedTitle === normalizedQuery) return 4;
+      if (normalizedTitle.startsWith(normalizedQuery)) return 3;
+      if (normalizedTitle.includes(normalizedQuery)) return 2;
+      return 1;
+    };
     return items
       .filter((item) => matchesSearch(query, item.title))
+      .sort((first, second) => score(second.title) - score(first.title))
       .slice(0, 12);
   }, [items, query]);
   return (
