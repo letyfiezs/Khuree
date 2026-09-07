@@ -52,21 +52,5 @@ export function matchesSearch(query: string, ...values: string[]) {
   const words = normalizeSearchText(query).split(" ").filter(Boolean);
   if (!words.length) return true;
   const searchable = normalizeSearchText(values.join(" "));
-  const variants = (value: string) => {
-    const result = new Set([value]);
-    const add = (transform: (text: string) => string) => result.add(transform(value));
-    add((text) => text.replace(/kh/g, "h"));
-    add((text) => text.replace(/ts/g, "c").replace(/ch/g, "c"));
-    add((text) => text.replace(/c/g, "ts"));
-    add((text) => text.replace(/zh/g, "j").replace(/j/g, "zh"));
-    add((text) => text.replace(/u/g, "o"));
-    add((text) => text.replace(/o/g, "u"));
-    return [...result];
-  };
-  const searchableVariants = variants(searchable);
-  return words.every((word) => {
-    return variants(word).some((candidate) =>
-      searchableVariants.some((searchableValue) => searchableValue.includes(candidate)),
-    );
-  });
+  return words.every((word) => searchable.includes(word));
 }

@@ -25,7 +25,7 @@ export function AdminSeriesHub({
   const [editCategories, setEditCategories] = useState<string[]>([]);
   const [editPoster, setEditPoster] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
-  const visibleShows = useMemo(() => shows.filter((show) => matchesSearch(query, show.title, show.synopsis, ...show.categories)), [query, shows]);
+  const visibleShows = useMemo(() => shows.filter((show) => matchesSearch(query, show.title)), [query, shows]);
   async function create(event: React.FormEvent) {
     event.preventDefault();
     const response = await fetch("/api/admin/series", {

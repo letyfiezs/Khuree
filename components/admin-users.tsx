@@ -69,7 +69,7 @@ export function AdminUsers({ initial }: { initial: AdminUserItem[] }) {
     return users.filter((user) => {
       const online = Boolean(user.lastSeenAt && checkedAt - new Date(user.lastSeenAt).getTime() < ONLINE_WINDOW_MS);
       const matchesFilter = filter === "all" || (filter === "vip" ? user.qpayPaidPlans.includes("vip") : filter === "packages" ? !user.qpayPaidPlans.includes("vip") && user.qpayPaidCount > 0 : filter === "none" ? user.qpayPaidCount === 0 : filter === "online" ? online : !online);
-      const matchesQuery = matchesSearch(query, user.name, user.phone, user.email, user.watching?.title ?? "");
+      const matchesQuery = matchesSearch(query, user.name, user.phone, user.email);
       return matchesFilter && matchesQuery;
     });
   }, [checkedAt, filter, query, users]);

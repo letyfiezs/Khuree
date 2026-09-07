@@ -72,7 +72,7 @@ export function AdminMovies({
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const visibleItems = useMemo(() => {
-    return items.filter((item) => (statusFilter === "all" || item.status === statusFilter) && matchesSearch(query, item.title, item.slug, item.seriesTitle ?? "", ...item.genre));
+    return items.filter((item) => (statusFilter === "all" || item.status === statusFilter) && matchesSearch(query, item.title, item.slug, item.seriesTitle ?? ""));
   }, [items, query, statusFilter]);
   const [posterMovie, setPosterMovie] = useState<ContentItem | null>(null);
   const [posterFile, setPosterFile] = useState<File | null>(null);

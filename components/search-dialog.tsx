@@ -35,9 +35,7 @@ export function SearchDialog({ items }: { items: SearchItem[] }) {
   const results = useMemo(() => {
     if (!query.trim()) return items.slice(0, 6);
     return items
-      .filter((item) =>
-        matchesSearch(query, item.title, item.synopsis, item.genre.join(" ")),
-      )
+      .filter((item) => matchesSearch(query, item.title))
       .slice(0, 12);
   }, [items, query]);
   return (
@@ -68,7 +66,7 @@ export function SearchDialog({ items }: { items: SearchItem[] }) {
                 ref={inputRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Кирилл эсвэл латинаар хайх..."
+                placeholder="Кино, цувралын нэрээр хайх..."
               />
               <button onClick={() => setOpen(false)} aria-label="Хаах">
                 ESC
@@ -100,7 +98,7 @@ export function SearchDialog({ items }: { items: SearchItem[] }) {
               {results.length === 0 && (
                 <div className="search-empty">
                   <b>Илэрц олдсонгүй</b>
-                  <span>Өөр нэр эсвэл ангиллаар хайж үзнэ үү.</span>
+                  <span>Кино, цувралын нэрээр дахин хайж үзнэ үү.</span>
                 </div>
               )}
             </div>
