@@ -13,7 +13,7 @@ export async function SiteHeader() {
   ]);
   const items = catalog
     .filter((item) => item.age !== "18+" || user?.adultUnlocked)
-    .map(({ id, slug, title, synopsis, genre, kind, year }) => ({
+    .map(({ id, slug, title, synopsis, genre, kind, year, posterUrl, seriesId }) => ({
       id,
       slug,
       title,
@@ -21,6 +21,8 @@ export async function SiteHeader() {
       genre,
       kind,
       year,
+      posterUrl,
+      seriesId,
     }));
   const categories = allCategories.filter((category) =>
     category.name !== "Босоо драма" && category.name !== "Орчуулгатай" && !audioLabels.includes(category.name as AudioLabel),

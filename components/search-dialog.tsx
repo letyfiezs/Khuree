@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { matchesSearch } from "@/lib/search-normalize";
+import { ResilientPoster } from "@/components/resilient-poster";
 type SearchItem = {
   id: string;
   slug: string;
@@ -10,6 +11,8 @@ type SearchItem = {
   genre: string[];
   kind: "movie" | "series";
   year: number;
+  posterUrl?: string;
+  seriesId?: string;
 };
 export function SearchDialog({ items }: { items: SearchItem[] }) {
   const [open, setOpen] = useState(false);
@@ -80,11 +83,11 @@ export function SearchDialog({ items }: { items: SearchItem[] }) {
             <div className="search-results">
               {results.map((item) => (
                 <Link
-                  href={`/movie/${encodeURIComponent(item.slug)}`}
+                  href={item.kind === "series" && item.seriesId ? `/series/${item.seriesId}` : `/movie/${encodeURIComponent(item.slug)}`}
                   key={item.id}
                   onClick={() => setOpen(false)}
                 >
-                  <i>{item.kind === "series" ? "S" : "▶"}</i>
+                  <i className={item.posterUrl ? "has-poster" : ""}>{item.posterUrl ? <ResilientPoster src={item.posterUrl} alt={item.title} /> : item.kind === "series" ? "S" : "▶"}</i>
                   <span>
                     <strong>{item.title}</strong>
                     <small>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { AdminUserItem } from "@/lib/admin-users";
+import { matchesSearch } from "@/lib/search-normalize";
 
 const formatDateTime = (value?: string) => {
   if (!value) return { date: "Ороогүй", time: "—" };
@@ -65,11 +66,10 @@ export function AdminUsers({ initial }: { initial: AdminUserItem[] }) {
     }).catch(() => setError("Сүлжээний алдаа гарлаа.")).finally(() => setChatLoading(false));
   }, [chatUser]);
   const visible = useMemo(() => {
-    const value = query.trim().toLocaleLowerCase("mn");
     return users.filter((user) => {
       const online = Boolean(user.lastSeenAt && checkedAt - new Date(user.lastSeenAt).getTime() < ONLINE_WINDOW_MS);
       const matchesFilter = filter === "all" || (filter === "vip" ? user.qpayPaidPlans.includes("vip") : filter === "packages" ? !user.qpayPaidPlans.includes("vip") && user.qpayPaidCount > 0 : filter === "none" ? user.qpayPaidCount === 0 : filter === "online" ? online : !online);
-      const matchesQuery = !value || [user.name, user.phone, user.email, user.watching?.title ?? ""].some((field) => field.toLocaleLowerCase("mn").includes(value));
+      const matchesQuery = matchesSearch(query, user.name, user.phone, user.email, user.watching?.title ?? "");
       return matchesFilter && matchesQuery;
     });
   }, [checkedAt, filter, query, users]);

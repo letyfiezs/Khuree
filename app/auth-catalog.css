@@ -533,9 +533,17 @@
   background: linear-gradient(145deg, #7e1018, #18080a);
   display: grid;
   place-items: center;
+  position: relative;
+  overflow: hidden;
   color: #fff;
   font-style: normal;
   font-size: 10px;
+}
+.search-results > a > i .poster-media,
+.search-results > a > i .poster-skeleton {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .search-results > a > span {
   display: flex;

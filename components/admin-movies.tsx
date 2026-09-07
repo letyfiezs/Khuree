@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
 import { audioLabels, type AudioLabel, type ContentItem } from "@/lib/content";
+import { matchesSearch } from "@/lib/search-normalize";
 import type { SubtitleTrack } from "@/lib/storage/types";
 type UploadState = "idle" | "uploading" | "processing" | "done" | "error";
 type EditableTrack = SubtitleTrack & { content?: string };
@@ -71,8 +72,7 @@ export function AdminMovies({
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const visibleItems = useMemo(() => {
-    const search = query.trim().toLocaleLowerCase("mn");
-    return items.filter((item) => (statusFilter === "all" || item.status === statusFilter) && (!search || [item.title, item.slug, item.seriesTitle ?? "", ...item.genre].some((value) => value.toLocaleLowerCase("mn").includes(search))));
+    return items.filter((item) => (statusFilter === "all" || item.status === statusFilter) && matchesSearch(query, item.title, item.slug, item.seriesTitle ?? "", ...item.genre));
   }, [items, query, statusFilter]);
   const [posterMovie, setPosterMovie] = useState<ContentItem | null>(null);
   const [posterFile, setPosterFile] = useState<File | null>(null);

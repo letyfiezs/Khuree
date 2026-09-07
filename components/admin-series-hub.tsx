@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { SeriesShow } from "@/lib/series-admin";
+import { matchesSearch } from "@/lib/search-normalize";
 export function AdminSeriesHub({
   initial,
   categories,
@@ -24,7 +25,7 @@ export function AdminSeriesHub({
   const [editCategories, setEditCategories] = useState<string[]>([]);
   const [editPoster, setEditPoster] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
-  const visibleShows = useMemo(() => { const search = query.trim().toLocaleLowerCase("mn"); return search ? shows.filter((show) => [show.title, show.synopsis, ...show.categories].some((value) => value.toLocaleLowerCase("mn").includes(search))) : shows; }, [query, shows]);
+  const visibleShows = useMemo(() => shows.filter((show) => matchesSearch(query, show.title, show.synopsis, ...show.categories)), [query, shows]);
   async function create(event: React.FormEvent) {
     event.preventDefault();
     const response = await fetch("/api/admin/series", {
