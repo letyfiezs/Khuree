@@ -175,13 +175,14 @@ export function PlayerShell({
       sessionStorage.setItem("khuree-live-movie-session", liveSessionRef.current);
     }
     const sessionId = liveSessionRef.current;
+    const bitrateKbps = Math.round((qualities.find((track) => track.active)?.bandwidth ?? 0) / 1000) || undefined;
     const send = (method: "POST" | "DELETE") => {
       void fetch("/api/analytics/live", {
         method,
         cache: "no-store",
         keepalive: true,
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ movieId, sessionId }),
+        body: JSON.stringify({ movieId, sessionId, bitrateKbps }),
       });
     };
     const visibilityChanged = () => send(document.visibilityState === "visible" ? "POST" : "DELETE");
@@ -199,7 +200,7 @@ export function PlayerShell({
       window.removeEventListener("pagehide", pageHidden);
       send("DELETE");
     };
-  }, [movieId, playing]);
+  }, [movieId, playing, qualities]);
   useEffect(() => () => {
     if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
     if (gestureHoldTimerRef.current) clearTimeout(gestureHoldTimerRef.current);
@@ -533,6 +534,7 @@ export function PlayerShell({
     if (track) {
       player.configure({ abr: { enabled: false } });
       player.selectVariantTrack(track, true);
+      setQualities((current) => current.map((item) => ({ ...item, active: item.id === track.id })));
     }
   };
   const changeRate = (rate: number) => {

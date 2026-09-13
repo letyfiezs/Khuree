@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth/local-auth";
 import { AdminShell } from "@/components/admin-shell";
 import { getCatalog } from "@/lib/catalog";
 import { AdminLiveStats } from "@/components/admin-live-stats";
+import { AdminServerMonitor } from "@/components/admin-server-monitor";
 export const dynamic = "force-dynamic";
 export default async function Admin() {
   const [user, content] = await Promise.all([requireAdmin(), getCatalog()]);
@@ -17,6 +18,7 @@ export default async function Admin() {
           ＋ Контент нэмэх
         </Link>
       </div>
+      <AdminServerMonitor />
       <AdminLiveStats recent={content.slice(0, 4).map(({ id, title, year, kind, status, accent }) => ({ id, title, year, kind, status, accent }))} />
     </AdminShell>
   );

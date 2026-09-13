@@ -27,6 +27,23 @@
   background: #271012;
 }
 
+.server-monitor { margin: 0 0 14px; padding: 20px; border: 1px solid #28282d; border-radius: 12px; background: linear-gradient(135deg, #121215, #0c0c0e); }
+.server-monitor .panel-title { margin-bottom: 16px; }
+.server-monitor .panel-title h2 { margin: 0 0 5px; font-size: 16px; }
+.server-monitor .panel-title p { margin: 0; color: #717178; font-size: 9px; }
+.server-health { display: inline-flex; align-items: center; gap: 7px; color: #777; font-size: 9px; font-weight: 900; letter-spacing: .12em; }
+.server-health i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 12px currentColor; }
+.server-health.healthy { color: #48dc8b; }.server-health.warning { color: #efbf4b; }.server-health.critical { color: #f15159; }
+.server-metric-grid,.server-stream-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.server-stream-grid { margin-top: 10px; }
+.server-metric-grid article,.server-stream-grid article { min-width: 0; padding: 14px; border: 1px solid #29292f; border-radius: 9px; background: #17171a; }
+.server-metric-grid span,.server-stream-grid span { display: block; color: #717178; font-size: 8px; font-weight: 900; letter-spacing: .11em; }
+.server-metric-grid b,.server-stream-grid b { display: block; overflow: hidden; margin: 10px 0 5px; color: #f5f5f6; font-size: 20px; letter-spacing: -.04em; text-overflow: ellipsis; white-space: nowrap; }
+.server-metric-grid small,.server-stream-grid small { display: block; overflow: hidden; color: #74747b; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.server-metric-grid article>i { display: block; height: 4px; margin-top: 12px; overflow: hidden; border-radius: 4px; background: #2d2d32; }.server-metric-grid article>i em { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #3ed586, #e50914); }
+.server-unavailable { margin: 0; padding: 15px; color: #999; font-size: 10px; border: 1px dashed #38383e; border-radius: 8px; }
+@media(max-width:900px){.server-metric-grid,.server-stream-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.server-monitor{padding:15px}.server-metric-grid,.server-stream-grid{grid-template-columns:1fr}.server-monitor .panel-title{align-items:flex-start}.server-health{font-size:8px}}
+
 /* Unified content management experience */
 .content-admin-toolbar { position:relative; margin-bottom:22px; padding:4px 0 20px; border-bottom:1px solid #232327; }
 .content-admin-toolbar .section-kicker { margin:0 0 8px; color:#e50914; font-size:8px; font-weight:900; letter-spacing:.22em; }

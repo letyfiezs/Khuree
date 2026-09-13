@@ -1,11 +1,12 @@
 import { getCurrentUser } from "@/lib/auth/local-auth";
 import { listActiveViewing, type ActiveViewing } from "@/lib/live-presence";
 import { createSupabaseAdminClient } from "@/lib/supabase";
+import { removeStreamMetric, reportStreamMetric } from "@/lib/stream-metrics";
 
 const STALE_SESSION_MS = 24 * 60 * 60 * 1_000;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-type PresenceBody = { movieId?: string; sessionId?: string };
+type PresenceBody = { movieId?: string; sessionId?: string; bitrateKbps?: number };
 function noStoreJson(body: unknown, init?: ResponseInit) {
   return Response.json(body, {
     ...init,
@@ -70,6 +71,8 @@ export async function POST(request: Request) {
 
   if (error) return noStoreJson({ error: error.message, setupRequired: error.code === "42P01" }, { status: error.code === "42P01" ? 503 : 500 });
 
+  reportStreamMetric(body.sessionId!, body.bitrateKbps);
+
   void db.from("live_movie_presence")
     .delete()
     .eq("viewer_id", user.id)
@@ -91,6 +94,8 @@ export async function DELETE(request: Request) {
     .eq("viewer_id", user.id)
     .eq("session_id", body.sessionId)
     .eq("movie_id", body.movieId);
+
+  removeStreamMetric(body.sessionId!);
 
   return error
     ? noStoreJson({ error: error.message }, { status: 500 })
