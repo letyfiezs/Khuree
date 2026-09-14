@@ -8,5 +8,7 @@ export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.verifyOtp({ email, token, type: "recovery" });
   if (error || !data.user) return Response.json({ error: "Код буруу эсвэл хугацаа нь дууссан байна." }, { status: 401 });
-  return Response.json({ ok: true });
+  const loginKind = data.user.user_metadata?.login_kind;
+  const credentialKind = loginKind === "phone" || loginKind === "email" ? "pin" : data.user.identities?.some((identity) => identity.provider === "email") ? "password" : "oauth";
+  return Response.json({ ok: true, credentialKind });
 }

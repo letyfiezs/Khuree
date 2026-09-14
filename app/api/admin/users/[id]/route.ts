@@ -1,7 +1,7 @@
 import { apiAdmin } from "@/lib/admin";
 import { createSupabaseAdminClient } from "@/lib/supabase";
 import { correctUserQPayPlan, setUserEntitlement } from "@/lib/user-entitlements";
-import { authEmail, pinPassword } from "@/lib/auth/pin-auth";
+import { normalizeIdentifier, pinPassword } from "@/lib/auth/pin-auth";
 import { qpaySettings } from "@/lib/qpay";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -18,10 +18,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (targetProfile?.role === "admin") return Response.json({ error: "Админы нууц үгийг энэ хэсгээс шинэчлэх боломжгүй." }, { status: 400 });
     const { data, error } = await client.auth.admin.getUserById(id);
     if (error || !data.user) return Response.json({ error: "Хэрэглэгч олдсонгүй." }, { status: 404 });
-    const isPhone = data.user.user_metadata?.login_kind === "phone" || data.user.email?.endsWith("@khuree.local");
-    if (isPhone && !/^\d{4}$/.test(body.password)) return Response.json({ error: "Утасны хэрэглэгчийн шинэ PIN 4 оронтой байна." }, { status: 400 });
-    if (!isPhone && body.password.length < 8) return Response.json({ error: "Нууц үг 8-аас дээш тэмдэгттэй байна." }, { status: 400 });
-    const password = isPhone ? pinPassword(data.user.user_metadata?.phone || data.user.phone || "", body.password) : body.password;
+    const loginKind = data.user.user_metadata?.login_kind;
+    const isPinLogin = loginKind === "phone" || loginKind === "email" || data.user.email?.endsWith("@khuree.local");
+    if (isPinLogin && !/^\d{4}$/.test(body.password)) return Response.json({ error: "PIN хэрэглэгчийн шинэ PIN яг 4 оронтой байна." }, { status: 400 });
+    if (!isPinLogin && body.password.length < 8) return Response.json({ error: "Нууц үг дор хаяж 8 тэмдэгттэй байна." }, { status: 400 });
+    const pinKind = loginKind === "email" ? "email" : "phone";
+    const identifier = isPinLogin ? normalizeIdentifier(pinKind, pinKind === "phone" ? data.user.user_metadata?.phone || data.user.phone || "" : data.user.email || "") : "";
+    const password = isPinLogin ? pinPassword(identifier, body.password) : body.password;
     const updated = await client.auth.admin.updateUserById(id, { password });
     if (updated.error) return Response.json({ error: "Нууц үг шинэчилж чадсангүй." }, { status: 500 });
     return Response.json({ ok: true });

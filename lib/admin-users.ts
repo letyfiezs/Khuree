@@ -8,6 +8,7 @@ export type AdminUserItem = {
   email: string;
   phone: string;
   loginKind: "phone" | "email";
+  credentialKind: "pin" | "password" | "oauth";
   role: "user" | "admin";
   watchPermissions: { movie: boolean; series: boolean; vertical: boolean; adult: boolean };
   createdAt: string;
@@ -62,6 +63,7 @@ export async function listAdminUsers(): Promise<AdminUserItem[]> {
       email,
       phone,
       loginKind: loginKind === "phone" || user.email?.endsWith("@khuree.local") ? "phone" : "email",
+      credentialKind: loginKind === "phone" || loginKind === "email" || user.email?.endsWith("@khuree.local") ? "pin" : user.identities?.some((identity) => identity.provider === "email") ? "password" : "oauth",
       role: profile?.role === "admin" ? "admin" : "user",
       watchPermissions: {
         movie: (permissions?.movie ?? true) && (planActive("vip") || planActive("movie") || legacyActive),

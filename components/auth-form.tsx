@@ -13,6 +13,7 @@ function RecoveryForm({ onBack }: { onBack: () => void }) {
   const [cooldown, setCooldown] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [credentialKind, setCredentialKind] = useState<"pin" | "password" | "oauth">("password");
   useEffect(() => { if (!cooldown) return; const timer = window.setInterval(() => setCooldown((value) => Math.max(0, value - 1)), 1000); return () => window.clearInterval(timer); }, [cooldown]);
   async function requestCode(event?: React.FormEvent) {
     event?.preventDefault();
@@ -26,12 +27,12 @@ function RecoveryForm({ onBack }: { onBack: () => void }) {
   async function verifyCode(event: React.FormEvent) {
     event.preventDefault(); setLoading(true); setError("");
     const response = await fetch("/api/auth/recovery/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, token: code }) });
-    const data = await response.json() as { error?: string };
-    setLoading(false); if (!response.ok) return setError(data.error ?? "Код буруу байна."); setStep("password");
+    const data = await response.json() as { error?: string; credentialKind?: "pin" | "password" | "oauth" };
+    setLoading(false); if (!response.ok) return setError(data.error ?? "Код буруу байна."); setCredentialKind(data.credentialKind ?? "password"); setStep("password");
   }
   async function updatePassword(event: React.FormEvent) {
     event.preventDefault(); setError("");
-    if (password.length < 8) return setError("Нууц үг 8-аас дээш тэмдэгттэй байна.");
+    if (credentialKind === "pin" ? !/^\d{4}$/.test(password) : password.length < 8) return setError(credentialKind === "pin" ? "Шинэ PIN яг 4 оронтой байна." : "Нууц үг дор хаяж 8 тэмдэгттэй байна.");
     if (password !== repeat) return setError("Нууц үг таарахгүй байна.");
     setLoading(true);
     const response = await fetch("/api/auth/recovery/update", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password }) });
@@ -39,14 +40,14 @@ function RecoveryForm({ onBack }: { onBack: () => void }) {
     setLoading(false); if (!response.ok) return setError(data.error ?? "Нууц үг шинэчилж чадсангүй."); setStep("done");
   }
   if (step === "done") return <div className="auth-success"><i>✓</i><h2>Нууц үг амжилттай шинэчлэгдлээ.</h2><button className="primary-button" onClick={onBack}>Нэвтрэх</button></div>;
-  const titles = { email: "Нууц үг сэргээх", otp: "Баталгаажуулах код", password: "Шинэ нууц үг" };
-  const descriptions = { email: "Бүртгэлтэй и-мэйл хаягаа оруулна уу.", otp: "Таны и-мэйл хаяг руу илгээсэн кодыг оруулна уу.", password: "Шинэ нууц үгээ тохируулна уу." };
+  const titles = { email: "Нууц үг сэргээх", otp: "Баталгаажуулах код", password: credentialKind === "pin" ? "Шинэ PIN" : "Шинэ нууц үг" };
+  const descriptions = { email: "Бүртгэлтэй и-мэйл хаягаа оруулна уу.", otp: "Таны и-мэйл хаяг руу илгээсэн кодыг оруулна уу.", password: credentialKind === "pin" ? "Шинэ 4 оронтой PIN-ээ тохируулна уу." : "Дор хаяж 8 тэмдэгттэй шинэ нууц үгээ тохируулна уу." };
   return <form onSubmit={step === "email" ? requestCode : step === "otp" ? verifyCode : updatePassword} className="auth-form recovery-form">
     <button type="button" className="auth-back" onClick={onBack}>← Нэвтрэх рүү буцах</button>
     <div className="auth-heading"><p className="section-kicker">ХҮРЭЭ AUTH</p><h1>{titles[step]}</h1><span>{descriptions[step]}</span></div>
     {step === "email" && <label>И-мэйл хаяг<input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" required placeholder="name@example.com" /></label>}
     {step === "otp" && <><label>6 оронтой код<input className="otp-input" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" required placeholder="000000" /></label><button type="button" className="auth-back" disabled={loading || cooldown > 0} onClick={() => void requestCode()}>{cooldown ? `Код дахин авах (${cooldown})` : "Код дахин авах"}</button></>}
-    {step === "password" && <><label>Шинэ нууц үг<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="new-password" required /></label><label>Шинэ нууц үгээ давтах<input value={repeat} onChange={(event) => setRepeat(event.target.value)} type="password" autoComplete="new-password" required /></label></>}
+    {step === "password" && <><label>Шинэ {credentialKind === "pin" ? "PIN" : "нууц үг"}<input value={password} onChange={(event) => setPassword(credentialKind === "pin" ? event.target.value.replace(/\D/g, "").slice(0, 4) : event.target.value)} type="password" inputMode={credentialKind === "pin" ? "numeric" : undefined} autoComplete="new-password" required /></label><label>Шинэ {credentialKind === "pin" ? "PIN" : "нууц үгээ"} давтах<input value={repeat} onChange={(event) => setRepeat(credentialKind === "pin" ? event.target.value.replace(/\D/g, "").slice(0, 4) : event.target.value)} type="password" inputMode={credentialKind === "pin" ? "numeric" : undefined} autoComplete="new-password" required /></label></>}
     {error && <p className="form-error">⚠ {error}</p>}
     <button className="primary-button" disabled={loading || (step === "otp" && code.length !== 6)}>{loading ? "Түр хүлээнэ үү…" : step === "email" ? "Код авах" : step === "otp" ? "Баталгаажуулах" : "Нууц үг шинэчлэх"}</button>
   </form>;

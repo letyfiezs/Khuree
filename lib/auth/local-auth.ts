@@ -6,7 +6,8 @@ import { authEmail, normalizeIdentifier, pinPassword } from "@/lib/auth/pin-auth
 
 export type WatchSection = "movie" | "series" | "vertical" | "adult";
 export type RegisteredDevice = { id: string; name: string; createdAt: string; lastSeenAt: string; fingerprint?: string };
-export type LocalUser = { id: string; name: string; email: string; phone: string; loginKind?: "phone" | "email"; role: "user" | "admin"; emailVerified: boolean; adultEnabled: boolean; hasParentalPin: boolean; adultUnlocked: boolean; canWatch: boolean; accessExpiresAt?: string; watchPermissions: Record<WatchSection, boolean>; devices: RegisteredDevice[]; deviceLimit: number | null };
+export type CredentialKind = "pin" | "password" | "oauth";
+export type LocalUser = { id: string; name: string; email: string; phone: string; loginKind?: "phone" | "email"; credentialKind: CredentialKind; role: "user" | "admin"; emailVerified: boolean; adultEnabled: boolean; hasParentalPin: boolean; adultUnlocked: boolean; canWatch: boolean; accessExpiresAt?: string; watchPermissions: Record<WatchSection, boolean>; devices: RegisteredDevice[]; deviceLimit: number | null };
 export const sessionCookieName = "sb-access-token";
 export const adminSessionCookieName = "khuree-admin-session";
 
@@ -41,12 +42,15 @@ export async function getCurrentUser(): Promise<LocalUser | null> {
   const defaultCanWatch = user.app_metadata?.can_watch !== false && (entitlementActive || anyPlanActive);
   const permissions = user.app_metadata?.watch_permissions as Partial<Record<WatchSection, boolean>> | undefined;
   const devices = Array.isArray(user.app_metadata?.devices) ? user.app_metadata.devices as RegisteredDevice[] : [];
+  const loginKind = user.user_metadata?.login_kind === "phone" || user.user_metadata?.login_kind === "email" ? user.user_metadata.login_kind : undefined;
+  const credentialKind: CredentialKind = loginKind ? "pin" : user.identities?.some((identity) => identity.provider === "email") ? "password" : "oauth";
   return {
     id: user.id,
     name: profile?.display_name || user.user_metadata?.name || user.phone || user.email?.split("@")[0] || "User",
     email: user.email || "",
     phone: user.phone || user.user_metadata?.phone || "",
-    loginKind: user.user_metadata?.login_kind === "phone" || user.user_metadata?.login_kind === "email" ? user.user_metadata.login_kind : undefined,
+    loginKind,
+    credentialKind,
     role: profile?.role === "admin" ? "admin" : "user",
     emailVerified: Boolean(user.phone_confirmed_at || user.email_confirmed_at),
     adultEnabled: Boolean(profile?.adult_enabled),
@@ -71,7 +75,7 @@ export async function requireUser(returnTo = "/movies") {
 }
 export async function requireAdmin() {
   if (await hasAdminPasswordSession()) {
-    return { id: "admin-password", name: "Хүрээ админ", email: "", phone: "", role: "admin", emailVerified: true, adultEnabled: true, hasParentalPin: false, adultUnlocked: true, canWatch: true, watchPermissions: { movie: true, series: true, vertical: true, adult: true }, devices: [], deviceLimit: null } satisfies LocalUser;
+    return { id: "admin-password", name: "Хүрээ админ", email: "", phone: "", credentialKind: "password", role: "admin", emailVerified: true, adultEnabled: true, hasParentalPin: false, adultUnlocked: true, canWatch: true, watchPermissions: { movie: true, series: true, vertical: true, adult: true }, devices: [], deviceLimit: null } satisfies LocalUser;
   }
   const user = await getCurrentUser();
   if (!user) redirect("/admin/login");
@@ -89,8 +93,10 @@ export async function updateAccount(userId: string, input: { name: string; curre
     email = authEmail(current.loginKind, identifier);
     password = pinPassword(identifier, input.currentPassword);
   }
-  const { error: authError } = await client.auth.signInWithPassword({ email, password });
-  if (authError) throw new Error(current.loginKind ? "Одоогийн нэвтрэх PIN буруу байна." : "Одоогийн нууц үг буруу байна.");
+  if (current.credentialKind !== "oauth") {
+    const { error: authError } = await client.auth.signInWithPassword({ email, password });
+    if (authError) throw new Error(current.loginKind ? "Одоогийн нэвтрэх PIN буруу байна." : "Одоогийн нууц үг буруу байна.");
+  }
   const patch: Record<string, unknown> = { display_name: input.name.trim(), adult_enabled: input.adultEnabled };
   if (input.parentalPin) patch.parental_pin_hash = pinHash(input.parentalPin);
   const { error } = await createSupabaseAdminClient().from("profiles").update(patch).eq("id", userId);

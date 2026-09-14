@@ -10,7 +10,7 @@ export async function PATCH(request: Request) {
     adultEnabled?: boolean;
     parentalPin?: string;
   };
-  if (!body.name?.trim() || !body.currentPassword)
+  if (!body.name?.trim() || (user.credentialKind !== "oauth" && !body.currentPassword))
     return Response.json(
       { error: "Нэр болон одоогийн нууц үгээ оруулна уу." },
       { status: 400 },
@@ -28,7 +28,7 @@ export async function PATCH(request: Request) {
   try {
     await updateAccount(user.id, {
       name: body.name,
-      currentPassword: body.currentPassword,
+      currentPassword: body.currentPassword ?? "",
       adultEnabled: Boolean(body.adultEnabled),
       parentalPin: body.parentalPin,
     });
