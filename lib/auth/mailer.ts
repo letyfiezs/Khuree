@@ -35,3 +35,22 @@ export async function sendVerificationEmail(
   );
   return { delivered: false, previewPath };
 }
+
+export async function sendRecoveryCodeEmail(email: string, code: string) {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    throw new Error("SMTP тохиргоо дутуу байна.");
+  }
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    secure: process.env.SMTP_SECURE === "true",
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM ?? process.env.SMTP_USER,
+    to: email,
+    subject: "Хүрээ — Сэргээх код",
+    text: `Таны Хүрээ бүртгэл сэргээх код: ${code}. Код 10 минут хүчинтэй. Та хүсээгүй бол энэ имэйлийг үл тооно уу.`,
+    html: `<div style="font-family:Arial;background:#090909;color:#fff;padding:32px"><h1 style="color:#e50914">ХҮРЭЭ</h1><p>Таны бүртгэл сэргээх код:</p><div style="font-size:32px;font-weight:800;letter-spacing:8px;padding:18px 0">${code}</div><p style="color:#aaa">Код 10 минут хүчинтэй. Та хүсээгүй бол энэ имэйлийг үл тооно уу.</p></div>`,
+  });
+}

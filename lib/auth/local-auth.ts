@@ -7,7 +7,7 @@ import { authEmail, normalizeIdentifier, pinPassword } from "@/lib/auth/pin-auth
 export type WatchSection = "movie" | "series" | "vertical" | "adult";
 export type RegisteredDevice = { id: string; name: string; createdAt: string; lastSeenAt: string; fingerprint?: string };
 export type CredentialKind = "pin" | "password" | "oauth";
-export type LocalUser = { id: string; name: string; email: string; phone: string; loginKind?: "phone" | "email"; credentialKind: CredentialKind; role: "user" | "admin"; emailVerified: boolean; adultEnabled: boolean; hasParentalPin: boolean; adultUnlocked: boolean; canWatch: boolean; accessExpiresAt?: string; watchPermissions: Record<WatchSection, boolean>; devices: RegisteredDevice[]; deviceLimit: number | null };
+export type LocalUser = { id: string; name: string; email: string; phone: string; recoveryEmail?: string; loginKind?: "phone" | "email"; credentialKind: CredentialKind; role: "user" | "admin"; emailVerified: boolean; adultEnabled: boolean; hasParentalPin: boolean; adultUnlocked: boolean; canWatch: boolean; accessExpiresAt?: string; watchPermissions: Record<WatchSection, boolean>; devices: RegisteredDevice[]; deviceLimit: number | null };
 export const sessionCookieName = "sb-access-token";
 export const adminSessionCookieName = "khuree-admin-session";
 
@@ -49,6 +49,7 @@ export async function getCurrentUser(): Promise<LocalUser | null> {
     name: profile?.display_name || user.user_metadata?.name || user.phone || user.email?.split("@")[0] || "User",
     email: user.email || "",
     phone: user.phone || user.user_metadata?.phone || "",
+    recoveryEmail: user.app_metadata?.recovery_email_verified_at && typeof user.app_metadata?.recovery_email === "string" ? user.app_metadata.recovery_email : undefined,
     loginKind,
     credentialKind,
     role: profile?.role === "admin" ? "admin" : "user",

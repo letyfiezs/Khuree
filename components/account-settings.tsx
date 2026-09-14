@@ -2,6 +2,7 @@
 import { useState } from "react";
 import type { LocalUser } from "@/lib/auth/local-auth";
 import { MyDevices } from "./my-devices";
+import { RecoveryEmailSettings } from "./recovery-email-settings";
 export function AccountSettings({ user }: { user: LocalUser }) {
   const [name, setName] = useState(user.name);
   const [adultEnabled, setAdultEnabled] = useState(user.adultEnabled);
@@ -125,6 +126,6 @@ export function AccountSettings({ user }: { user: LocalUser }) {
       <small className="password-rule">{isPin ? "PIN яг 4 оронтой байна." : "Нууц үг дор хаяж 8 тэмдэгттэй байна."}</small>
       {passwordMessage && <p className="account-message">{passwordMessage}</p>}
       <button className="primary-button" disabled={passwordSaving}>{passwordSaving ? "Шинэчилж байна…" : isPin ? "PIN шинэчлэх" : "Нууц үг шинэчлэх"}</button>
-    </form><MyDevices /></div>
+    </form>{user.loginKind === "phone" && <RecoveryEmailSettings currentEmail={user.recoveryEmail} />}<MyDevices /></div>
   );
 }
