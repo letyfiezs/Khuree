@@ -42,6 +42,8 @@ export function qpaySettings() {
 }
 
 export function qpayClient() {
-  const config = qpaySettings();
-  return new QPayClient(config);
+  client ??= new QPayClient(qpaySettings());
+  return client;
 }
+
+let client: QPayClient | undefined;

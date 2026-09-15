@@ -10,6 +10,7 @@ export async function GET(request: Request) {
   if (!user)
     return Response.json({ error: "Нэвтрэх шаардлагатай." }, { status: 401 });
   const id = new URL(request.url).searchParams.get("order_id");
+  const verifyWithQPay = new URL(request.url).searchParams.get("verify") === "1";
   if (!id) return Response.json({ error: "order_id дутуу." }, { status: 400 });
   const payment = await getPayment(id);
   if (!payment || payment.userId !== user.id)
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
     await setUserPlanEntitlement(payment.userId, payment.plan, { days: qpaySettings().days, source: "qpay", startsAt: payment.paidAt });
     return Response.json({ status: "paid", plan: payment.plan });
   }
-  if (payment.status === "pending" && payment.invoiceId) {
+  if (verifyWithQPay && payment.status === "pending" && payment.invoiceId) {
     try {
       const check = await qpayClient().checkPayment({ objectType: "INVOICE", objectId: payment.invoiceId, offset: { pageNumber: 1, pageLimit: 100 } });
       const paidRows = check.rows.filter((row) => row.paymentStatus === "PAID");

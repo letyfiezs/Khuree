@@ -41,7 +41,7 @@ export function QPayCheckout({ authenticated, days, plans }: { authenticated: bo
     if (!payment) return;
     setLoading(true);
     setError("");
-    const response = await fetch(`/api/qpay/status?order_id=${encodeURIComponent(payment.id)}`);
+    const response = await fetch(`/api/qpay/status?order_id=${encodeURIComponent(payment.id)}&verify=1`);
     const data = await response.json() as { status?: Payment["status"]; error?: string };
     setLoading(false);
     if (!response.ok) return setError(data.error ?? "Төлбөр шалгаж чадсангүй.");
@@ -61,7 +61,7 @@ export function QPayCheckout({ authenticated, days, plans }: { authenticated: bo
         setPayment((current) =>
           current ? { ...current, status: data.status } : null,
         );
-    }, 3000);
+    }, 8000);
     return () => window.clearInterval(timer);
   }, [payment]);
 

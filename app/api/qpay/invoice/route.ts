@@ -44,13 +44,10 @@ export async function POST(request: Request) {
   } catch (error) {
     if (orderId) await failPayment(orderId).catch(() => undefined);
     console.error("QPay invoice error", error);
-    let message = error instanceof Error ? error.message : "QPay нэхэмжлэх үүссэнгүй.";
+    let message = "QPay үйлчилгээтэй холбогдож чадсангүй. Түр хүлээгээд дахин оролдоно уу.";
     if (isQPayError(error)) {
-      try {
-        const raw = JSON.parse(error.rawBody) as { message?: unknown; error?: unknown };
-        const detail = raw.message ?? raw.error;
-        message = typeof detail === "string" ? detail : JSON.stringify(detail);
-      } catch { /* Keep the library error message. */ }
+      if (error.statusCode === 401) message = "QPay нэвтрэх тохиргоо хүчингүй байна. Админтай холбогдоно уу.";
+      else if (error.statusCode === 403 || error.statusCode === 429) message = "QPay хүсэлт түр хязгаарлагдсан байна. Хэсэг хүлээгээд дахин оролдоно уу.";
     }
     return Response.json(
       { error: message },
