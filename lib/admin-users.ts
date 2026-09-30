@@ -26,6 +26,10 @@ export type AdminUserItem = {
   qpayPayments: { id: string; plan: "movie" | "series" | "vertical" | "adult" | "vip"; amount: number; paidAt?: string; correctedFromPlan?: string }[];
 };
 
+type ProfileRow = { id: string; display_name: string | null; role: "user" | "admin" | null };
+
+const PROFILE_QUERY_BATCH_SIZE = 100;
+
 export async function listAdminUsers(): Promise<AdminUserItem[]> {
   const client = createSupabaseAdminClient();
   const authUsers = [];
@@ -36,11 +40,16 @@ export async function listAdminUsers(): Promise<AdminUserItem[]> {
     if (data.users.length < 1000) break;
   }
   const ids = authUsers.map((user) => user.id);
-  const { data: profiles, error: profileError } = ids.length
-    ? await client.from("profiles").select("id,display_name,role").in("id", ids)
-    : { data: [], error: null };
-  if (profileError) throw profileError;
-  const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+  const profiles: ProfileRow[] = [];
+  for (let index = 0; index < ids.length; index += PROFILE_QUERY_BATCH_SIZE) {
+    const { data, error } = await client
+      .from("profiles")
+      .select("id,display_name,role")
+      .in("id", ids.slice(index, index + PROFILE_QUERY_BATCH_SIZE));
+    if (error) throw error;
+    profiles.push(...(data as ProfileRow[]));
+  }
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
 
   return authUsers.map((user) => {
     const profile = profileById.get(user.id);
