@@ -1,5 +1,5 @@
 import "server-only";
-import { AbortMultipartUploadCommand, CompleteMultipartUploadCommand, CreateMultipartUploadCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client, UploadPartCommand } from "@aws-sdk/client-s3";
+import { AbortMultipartUploadCommand, CompleteMultipartUploadCommand, CreateMultipartUploadCommand, DeleteObjectCommand, DeleteObjectsCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client, UploadPartCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export const R2_HARD_LIMIT_BYTES = 2 * 1000 ** 4;
@@ -53,6 +53,33 @@ export async function deleteR2Object(key: string) {
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
   usageCache = undefined;
   textCache.delete(key);
+}
+
+export async function deleteR2Prefixes(prefixes: string[]) {
+  const normalizedPrefixes = [...new Set(prefixes.filter((prefix) => prefix && !prefix.startsWith("/") && !prefix.includes("..")))];
+  if (!normalizedPrefixes.length) return 0;
+  const { client, bucket } = r2();
+  const keys: string[] = [];
+  for (const prefix of normalizedPrefixes) {
+    let continuationToken: string | undefined;
+    do {
+      const page = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, ContinuationToken: continuationToken }));
+      for (const object of page.Contents ?? []) if (object.Key) keys.push(object.Key);
+      continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (continuationToken);
+  }
+  for (let index = 0; index < keys.length; index += 1000) {
+    const result = await client.send(new DeleteObjectsCommand({
+      Bucket: bucket,
+      Delete: { Objects: keys.slice(index, index + 1000).map((Key) => ({ Key })), Quiet: true },
+    }));
+    if (result.Errors?.length) throw new Error(`R2 folder delete failed for ${result.Errors.length} object(s).`);
+  }
+  if (keys.length) {
+    usageCache = undefined;
+    for (const key of keys) textCache.delete(key);
+  }
+  return keys.length;
 }
 export async function signedR2DownloadUrl(key: string, downloadName?: string) {
   const { client, bucket } = r2();

@@ -606,7 +606,7 @@ export function AdminMovies({
   async function deleteMovie(movie: ContentItem) {
     if (
       !window.confirm(
-        `“${movie.title}” киног видео, зураг, subtitle-тай нь бүрэн устгах уу?`,
+        `“${movie.title}” киног R2 folder, видео, зураг, subtitle-тай нь бүрэн устгах уу?`,
       )
     )
       return;

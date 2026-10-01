@@ -1,5 +1,5 @@
 import { apiAdmin } from "@/lib/admin";
-import { deleteR2Object } from "@/lib/r2";
+import { deleteR2Object, deleteR2Prefixes } from "@/lib/r2";
 import { createSupabaseAdminClient } from "@/lib/supabase";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -17,7 +17,16 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (!(await apiAdmin())) return Response.json({ error: "Админ эрх шаардлагатай." }, { status: 403 });
   const { id } = await params; if (!uuid.test(id)) return Response.json({ error: "ID буруу." }, { status: 400 });
   const db = createSupabaseAdminClient(); const { data: movie } = await db.from("movies").select("video_key").eq("id", id).maybeSingle(); if (!movie) return Response.json({ error: "Кино олдсонгүй." }, { status: 404 });
-  if (movie.video_key && /^movies\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(mp4|m3u8|ts)$/i.test(movie.video_key)) await deleteR2Object(movie.video_key);
+  let r2ObjectsDeleted = 0;
+  try {
+    r2ObjectsDeleted = await deleteR2Prefixes([`movies/${id}/`, `posters/${id}/`, `backdrops/${id}/`, `subtitles/${id}/`]);
+    if (movie.video_key && !movie.video_key.startsWith(`movies/${id}/`) && /^movies\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(mp4|m3u8|ts)$/i.test(movie.video_key)) {
+      await deleteR2Object(movie.video_key);
+      r2ObjectsDeleted += 1;
+    }
+  } catch {
+    return Response.json({ error: "Киноны R2 folder-ийг бүрэн устгаж чадсангүй. Database дахь кино устгагдаагүй." }, { status: 502 });
+  }
   const { error } = await db.from("movies").delete().eq("id", id); if (error) return Response.json({ error: error.message }, { status: 500 });
-  return Response.json({ deleted: true, id });
+  return Response.json({ deleted: true, id, r2ObjectsDeleted });
 }
