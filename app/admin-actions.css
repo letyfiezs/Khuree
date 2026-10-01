@@ -529,7 +529,8 @@
 .series-admin-card { position: relative; }
 .series-card-link { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 12px; }
 .series-card-link > i.has-poster { display: block; width: 72px; aspect-ratio: 2/3; border-radius: 6px; background-position: center; background-size: cover; box-shadow: 0 10px 24px #000; }
-.series-edit-button { position: absolute; right: 14px; bottom: 14px; z-index: 2; }
+.series-card-actions { position:absolute; right:14px; bottom:14px; z-index:2; display:flex; gap:7px; }
+.series-edit-button { position:static; right:auto; bottom:auto; }
 .edit-series-modal { width: min(680px,100%); max-height: calc(100dvh - 30px); overflow-y: auto; }
 .series-edit-poster { width: 120px; aspect-ratio: 2/3; margin-top: 18px; display: grid; place-items: center; border: 1px dashed #3b3b40; border-radius: 8px; background: #09090a center/cover no-repeat; color: #666; font-size: 9px; }
 .series-detail-head {

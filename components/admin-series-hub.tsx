@@ -25,6 +25,7 @@ export function AdminSeriesHub({
   const [editCategories, setEditCategories] = useState<string[]>([]);
   const [editPoster, setEditPoster] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string>();
   const visibleShows = useMemo(() => shows.filter((show) => matchesSearch(query, show.title)), [query, shows]);
   async function create(event: React.FormEvent) {
     event.preventDefault();
@@ -72,6 +73,17 @@ export function AdminSeriesHub({
     } catch (saveError) { setError(saveError instanceof Error ? saveError.message : "Алдаа гарлаа."); }
     finally { setSaving(false); }
   }
+  async function deleteShow(show: SeriesShow) {
+    if (!window.confirm(`“${show.title}” цувралыг бүх бүлэг, анги, видео, зураг, subtitle-тай нь бүрмөсөн устгах уу?`)) return;
+    setDeleting(show.id); setError("");
+    try {
+      const response = await fetch(`/api/admin/series/${show.id}`, { method: "DELETE" });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Цувралыг устгаж чадсангүй.");
+      setShows((current) => current.filter((item) => item.id !== show.id));
+    } catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : "Цувралыг устгаж чадсангүй."); }
+    finally { setDeleting(undefined); }
+  }
   return (
     <>
       <div className="admin-toolbar content-admin-toolbar series-admin-toolbar">
@@ -86,6 +98,7 @@ export function AdminSeriesHub({
       </div>
       <div className="content-overview series-overview"><article><span>НИЙТ ЦУВРАЛ</span><b>{shows.length}</b><small>Бүртгэлтэй бүтээл</small></article><article><span>НАСАНД ХҮРЭГЧДИЙН</span><b>{shows.filter((show) => show.ageRating === "18+").length}</b><small>18+ ангилалтай</small></article><article><span>АНГИЛАЛ</span><b>{new Set(shows.flatMap((show) => show.categories)).size}</b><small>Ашигласан төрөл</small></article></div>
       <div className="content-controls series-controls"><label><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Цувралын нэр, ангиллаар хайх" /></label><small>{visibleShows.length} цуврал</small></div>
+      {error && !open && !editing && <p className="form-error">⚠ {error}</p>}
       <div className="series-hub-grid">
         {visibleShows.map((show) => (
           <article className="series-admin-card" key={show.id}>
@@ -100,7 +113,10 @@ export function AdminSeriesHub({
             </div>
             <span>Бүлгүүд →</span>
           </Link>
-          <button type="button" className="row-action series-edit-button" onClick={() => openEditor(show)}>Засах / Thumbnail</button>
+          <div className="series-card-actions">
+            <button type="button" className="row-action series-edit-button" disabled={deleting === show.id} onClick={() => openEditor(show)}>Засах / Thumbnail</button>
+            <button type="button" className="row-action danger" disabled={deleting === show.id} onClick={() => void deleteShow(show)}>{deleting === show.id ? "Устгаж байна…" : "Устгах"}</button>
+          </div>
           </article>
         ))}
         {!visibleShows.length && <div className="series-empty-state"><i>▤</i><b>{shows.length ? "Цуврал олдсонгүй" : "Анхны цувралаа үүсгэнэ үү"}</b><span>{shows.length ? "Хайлтын үгээ өөрчилж үзнэ үү." : "Цуврал үүсгээд бүлэг болон анги нэмэх боломжтой."}</span>{!shows.length && <button className="primary-button" onClick={() => setOpen(true)}>＋ Цуврал үүсгэх</button>}</div>}
