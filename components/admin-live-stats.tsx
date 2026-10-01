@@ -6,6 +6,9 @@ type StorageCategory = { bytes: number; objects: number };
 type Stats = { updatedAt: string; storage: { bytes: number; objects: number; limitBytes: number; freeTierBytes: number; remainingBytes: number; percent: number; estimatedStorageUsd: number; breakdown: Record<"video" | "subtitle" | "thumbnail" | "hero" | "other", StorageCategory> }; operations: { configured: boolean; classA: number; classB: number; other: number; classARemaining: number; classBRemaining: number; classACostUsd: number; classBCostUsd: number; error?: string }; movies: number; users: number; totalViews: number; uniqueViews: number; todayViews: number; uniqueViewers7d: number; days: { date: string; views: number }[]; topMovies: { title: string; views: number }[] };
 type Recent = { id: string; title: string; year: number; kind: string; status: string; accent: string };
 const gb = (bytes: number) => `${(bytes / 1_000_000_000).toFixed(2)} GB`;
+const storageLimit = (bytes: number) => bytes >= 1_000_000_000_000
+  ? `${Number((bytes / 1_000_000_000_000).toFixed(2))} TB`
+  : gb(bytes);
 const compact = (value: number) => new Intl.NumberFormat("mn-MN", { notation: "compact", maximumFractionDigits: 2 }).format(value);
 
 export function AdminLiveStats({ recent }: { recent: Recent[] }) {
@@ -36,7 +39,7 @@ export function AdminLiveStats({ recent }: { recent: Recent[] }) {
     {error && <p className="stats-error">{error}</p>}
     <div className="stats">
       <article><span>R2 АШИГЛАСАН</span><b>{stats ? gb(stats.storage.bytes) : "—"}</b><small>{stats ? `${stats.storage.objects} файл · ${stats.storage.percent.toFixed(1)}%` : "Cloudflare R2"}</small></article>
-      <article><span>990 GB-С ҮЛДСЭН</span><b>{stats ? gb(stats.storage.remainingBytes) : "—"}</b><small>Хатуу upload хязгаар · free tier 10 GB</small><div className="storage-meter"><i style={{ width: `${stats?.storage.percent ?? 0}%` }} /></div></article>
+      <article><span>{stats ? `${storageLimit(stats.storage.limitBytes)}-С ҮЛДСЭН` : "R2 ҮЛДСЭН"}</span><b>{stats ? gb(stats.storage.remainingBytes) : "—"}</b><small>Хатуу upload хязгаар · free tier 10 GB</small><div className="storage-meter"><i style={{ width: `${stats?.storage.percent ?? 0}%` }} /></div></article>
       <article><span>САРЫН STORAGE ТООЦОО</span><b>{stats ? `$${stats.storage.estimatedStorageUsd.toFixed(2)}` : "—"}</b><small>Ойролцоогоор · request зардал ороогүй</small></article>
       <article><span>НИЙТ ҮЗЭЛТ</span><b>{stats?.totalViews ?? "—"}</b><small>Бодит play event</small></article>
       <article><span>ДАВТАГДААГҮЙ ҮЗЭЛТ</span><b>{stats?.uniqueViews ?? "—"}</b><small>1 хэрэглэгч · 1 кино = 1 үзэлт</small></article>

@@ -2,7 +2,7 @@ import "server-only";
 import { AbortMultipartUploadCommand, CompleteMultipartUploadCommand, CreateMultipartUploadCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client, UploadPartCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-export const R2_HARD_LIMIT_BYTES = 990 * 1000 ** 3;
+export const R2_HARD_LIMIT_BYTES = 2 * 1000 ** 4;
 const USAGE_CACHE_MS = 15 * 60 * 1000;
 const TEXT_CACHE_MS = 5 * 60 * 1000;
 type R2Usage = Awaited<ReturnType<typeof scanR2StorageUsage>>;
@@ -12,7 +12,7 @@ function logR2(operation: string, key = "") {
   if (process.env.NODE_ENV !== "production") console.info(`[R2] ${operation}${key ? ` ${key}` : ""}`);
 }
 export class R2StorageLimitError extends Error {
-  constructor() { super("R2 хадгалах сан 990 GB хатуу хязгаарт хүрсэн. Зай чөлөөлсний дараа дахин upload хийнэ үү."); }
+  constructor() { super("R2 хадгалах сан 2 TB хатуу хязгаарт хүрсэн. Зай чөлөөлсний дараа дахин upload хийнэ үү."); }
 }
 
 function config() {
