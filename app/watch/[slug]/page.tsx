@@ -34,6 +34,7 @@ export default async function Watch({
       synopsis: entry.synopsis,
       age: entry.age,
       duration: entry.duration,
+      segmentMinutes: entry.verticalSegmentMinutes ?? 3,
       posterUrl: entry.posterUrl,
       videoUrl: await signedR2PlaybackUrl(entry.videoKey!),
       subtitles: (entry.subtitles ?? []).map(({ id, label, language, sourceUrl }) => ({ id, label, language, sourceUrl })),

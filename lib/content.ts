@@ -31,6 +31,7 @@ export type ContentItem = {
   seasonNumber?: number;
   episodeNumber?: number;
   audioLabel?: AudioLabel;
+  verticalSegmentMinutes?: 3 | 5;
 };
 export const content: ContentItem[] = [];
 export const getContent = (slug: string) =>

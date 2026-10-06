@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { audioLabels, type AudioLabel, type ContentItem } from "@/lib/content";
 import { matchesSearch } from "@/lib/search-normalize";
 import type { SubtitleTrack } from "@/lib/storage/types";
+import { verticalDramaCategory } from "@/lib/vertical-drama";
 type UploadState = "idle" | "uploading" | "processing" | "done" | "error";
 type EditableTrack = SubtitleTrack & { content?: string };
 
@@ -61,6 +62,7 @@ export function AdminMovies({
   const [ageRating, setAgeRating] = useState(forcedAgeRating ?? "13+");
   const [audioLabel, setAudioLabel] = useState<AudioLabel>("Субтай");
   const [targetQuality, setTargetQuality] = useState("original");
+  const [segmentMinutes, setSegmentMinutes] = useState<3 | 5>(3);
   const [seriesTitle, setSeriesTitle] = useState(fixedSeries?.title ?? "");
   const [seasonNumber, setSeasonNumber] = useState(
     fixedSeries?.seasonNumber ?? 1,
@@ -93,6 +95,7 @@ export function AdminMovies({
   const [editSeriesTitle, setEditSeriesTitle] = useState("");
   const [editSeasonNumber, setEditSeasonNumber] = useState(1);
   const [editEpisodeNumber, setEditEpisodeNumber] = useState(1);
+  const [editSegmentMinutes, setEditSegmentMinutes] = useState<3 | 5>(3);
   const [subtitleMovie, setSubtitleMovie] = useState<ContentItem | null>(null);
   const [tracks, setTracks] = useState<EditableTrack[]>([]);
   const [trackId, setTrackId] = useState<string>();
@@ -111,6 +114,7 @@ export function AdminMovies({
     setAgeRating(forcedAgeRating ?? "13+");
     setAudioLabel("Субтай");
     setTargetQuality("original");
+    setSegmentMinutes(3);
     setSeriesTitle(fixedSeries?.title ?? "");
     setSeasonNumber(fixedSeries?.seasonNumber ?? 1);
     setEpisodeNumber(suggestedEpisodeNumber);
@@ -215,6 +219,7 @@ export function AdminMovies({
             seriesTitle: mode === "series" ? seriesTitle.trim() : undefined,
             seasonNumber: mode === "series" ? seasonNumber : undefined,
             episodeNumber: mode === "series" ? episodeNumber : undefined,
+            verticalSegmentMinutes: forcedCategory === verticalDramaCategory ? segmentMinutes : undefined,
             seriesId: fixedSeries?.id,
             seasonId: fixedSeries?.seasonId,
           },
@@ -247,6 +252,7 @@ export function AdminMovies({
           videoKey: result.videoKey,
           subtitles: [],
           audioLabel,
+          verticalSegmentMinutes: forcedCategory === verticalDramaCategory ? segmentMinutes : undefined,
         },
         ...current,
       ]);
@@ -541,6 +547,7 @@ export function AdminMovies({
     setEditSeriesTitle(movie.seriesTitle ?? "");
     setEditSeasonNumber(movie.seasonNumber ?? 1);
     setEditEpisodeNumber(movie.episodeNumber ?? 1);
+    setEditSegmentMinutes(movie.verticalSegmentMinutes ?? 3);
     setError("");
   }
   async function saveMovie(event: React.FormEvent) {
@@ -571,6 +578,8 @@ export function AdminMovies({
             editMovie.kind === "series" ? editSeasonNumber : undefined,
           episodeNumber:
             editMovie.kind === "series" ? editEpisodeNumber : undefined,
+          verticalSegmentMinutes:
+            forcedCategory === verticalDramaCategory ? editSegmentMinutes : undefined,
         }),
       });
       const data = (await response.json()) as { error?: string };
@@ -588,6 +597,7 @@ export function AdminMovies({
                 seriesTitle: editSeriesTitle.trim() || undefined,
                 seasonNumber: editSeasonNumber,
                 episodeNumber: editEpisodeNumber,
+                verticalSegmentMinutes: editSegmentMinutes,
               }
             : item,
         ),
@@ -656,7 +666,7 @@ export function AdminMovies({
                 <b>{item.title}</b>
                 <small>
                   {item.videoKey
-                    ? `${item.kind === "series" && item.seriesTitle ? `${item.seriesTitle} · S${item.seasonNumber} E${item.episodeNumber} · ` : ""}Видео · ${item.subtitles?.length ?? 0} subtitle`
+                    ? `${item.kind === "series" && item.seriesTitle ? `${item.seriesTitle} · S${item.seasonNumber} E${item.episodeNumber} · ` : ""}Видео${forcedCategory === verticalDramaCategory ? ` · ${item.verticalSegmentMinutes ?? 3} минутаар хуваана` : ""} · ${item.subtitles?.length ?? 0} subtitle`
                     : item.slug}
                 </small>
               </span>
@@ -818,6 +828,16 @@ export function AdminMovies({
                 </select>
                 <small>Чанар бууруулах үед MP4/H.264 болгон шахна.</small>
               </label>
+              {forcedCategory === verticalDramaCategory && (
+                <label>
+                  Reel хэсгийн урт
+                  <select value={segmentMinutes} onChange={(event) => setSegmentMinutes(Number(event.target.value) === 5 ? 5 : 3)}>
+                    <option value="3">3 минут</option>
+                    <option value="5">5 минут</option>
+                  </select>
+                  <small>Нэг бүтэн видео автоматаар олон хэсэг болж харагдана.</small>
+                </label>
+              )}
             </div>
             <fieldset>
               <legend>
@@ -1131,6 +1151,15 @@ export function AdminMovies({
                 {audioLabels.map((label) => <option value={label} key={label}>{label}</option>)}
               </select>
             </label>
+            {forcedCategory === verticalDramaCategory && (
+              <label>
+                Reel хэсгийн урт
+                <select value={editSegmentMinutes} onChange={(event) => setEditSegmentMinutes(Number(event.target.value) === 5 ? 5 : 3)}>
+                  <option value="3">3 минут</option>
+                  <option value="5">5 минут</option>
+                </select>
+              </label>
+            )}
             {editMovie.kind === "series" && (
               <div className="upload-options-grid series-fields">
                 <label>

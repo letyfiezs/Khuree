@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { recentlyWatchedKey, type RecentWatchItem } from "@/components/recently-watched";
 
 export type VerticalReelItem = {
@@ -12,9 +12,18 @@ export type VerticalReelItem = {
   synopsis: string;
   age: string;
   duration: string;
+  segmentMinutes: 3 | 5;
   posterUrl?: string;
   videoUrl: string;
   subtitles: { id: string; label: string; language: string; sourceUrl?: string }[];
+};
+
+type PlayableReel = VerticalReelItem & {
+  reelKey: string;
+  part: number;
+  partCount: number;
+  startSeconds: number;
+  endSeconds?: number;
 };
 
 const LIVE_HEARTBEAT_INTERVAL_MS = 15_000;
@@ -30,6 +39,7 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
   const scrollFrameRef = useRef<number | undefined>(undefined);
   const lastScrollAtRef = useRef(0);
   const activeRef = useRef(0);
+  const advancingRef = useRef(false);
   const [active, setActive] = useState(0);
   const [muted, setMuted] = useState(true);
   const [playingId, setPlayingId] = useState<string>();
@@ -38,12 +48,30 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [videoError, setVideoError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [durations, setDurations] = useState<Record<string, number>>({});
+  const reels = useMemo(() => items.flatMap((item): PlayableReel[] => {
+    const duration = durations[item.id];
+    const segmentSeconds = item.segmentMinutes * 60;
+    const partCount = duration ? Math.max(1, Math.ceil(duration / segmentSeconds)) : 1;
+    return Array.from({ length: partCount }, (_, part) => ({
+      ...item,
+      reelKey: `${item.id}:${part}`,
+      part,
+      partCount,
+      startSeconds: part * segmentSeconds,
+      endSeconds: duration ? Math.min(duration, (part + 1) * segmentSeconds) : undefined,
+    }));
+  }), [durations, items]);
 
   useEffect(() => {
     videosRef.current.forEach((video, index) => {
       if (!video) return;
       video.muted = muted;
       if (index === active) {
+        const reel = reels[index];
+        if (reel && video.readyState >= 1 && (video.currentTime < reel.startSeconds - 0.25 || (reel.endSeconds && video.currentTime >= reel.endSeconds - 0.1))) {
+          video.currentTime = reel.startSeconds;
+        }
         if (video.readyState === 0) video.load();
         void video.play().catch((error: unknown) => {
           if (error instanceof DOMException && error.name === "AbortError") return;
@@ -53,10 +81,10 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
       }
       else video.pause();
     });
-  }, [active, muted]);
+  }, [active, muted, reels]);
 
   useEffect(() => {
-    const item = items[active];
+    const item = reels[active];
     if (!item || playingId !== item.id) return;
     if (!liveSessionRef.current) {
       const saved = sessionStorage.getItem("khuree-vertical-live-session");
@@ -70,17 +98,17 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
     send("POST");
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") send("POST"); }, LIVE_HEARTBEAT_INTERVAL_MS);
     return () => { window.clearInterval(timer); send("DELETE"); };
-  }, [active, items, playingId]);
+  }, [active, playingId, reels]);
 
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
-      if (event.key === "ArrowDown") { event.preventDefault(); goTo(Math.min(items.length - 1, active + 1)); }
+      if (event.key === "ArrowDown") { event.preventDefault(); goTo(Math.min(reels.length - 1, active + 1)); }
       if (event.key === "ArrowUp") { event.preventDefault(); goTo(Math.max(0, active - 1)); }
       if (event.key === " ") { event.preventDefault(); togglePlayback(active); }
     };
     window.addEventListener("keydown", keyboard);
     return () => window.removeEventListener("keydown", keyboard);
-  }, [active, items.length]);
+  }, [active, reels.length]);
 
   useLayoutEffect(() => {
     const stopPlayback = () => videosRef.current.forEach((video) => video?.pause());
@@ -104,9 +132,10 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
     scrollFrameRef.current = window.requestAnimationFrame(() => {
       const pageHeight = root.clientHeight;
       if (!pageHeight) return;
-      const next = Math.max(0, Math.min(items.length - 1, Math.round(root.scrollTop / pageHeight)));
+      const next = Math.max(0, Math.min(reels.length - 1, Math.round(root.scrollTop / pageHeight)));
       if (next === activeRef.current) return;
       activeRef.current = next;
+      advancingRef.current = false;
       setActive(next);
       setLoading(true);
       setPlayingId(undefined);
@@ -128,6 +157,30 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
       if (video.readyState === 0) video.load();
       void video.play().catch(() => { setShowPlay(true); setVideoError("Видео тоглуулж чадсангүй. Дахин дарж үзнэ үү."); });
     } else video.pause();
+  }
+
+  function registerDuration(item: PlayableReel, video: HTMLVideoElement) {
+    if (Number.isFinite(video.duration) && video.duration > 0) {
+      const rounded = Math.round(video.duration * 10) / 10;
+      setDurations((current) => current[item.id] === rounded ? current : { ...current, [item.id]: rounded });
+    }
+    if (video.currentTime < item.startSeconds - 0.25 || (item.endSeconds && video.currentTime >= item.endSeconds - 0.1)) {
+      video.currentTime = item.startSeconds;
+    }
+  }
+
+  function advanceFrom(index: number, video: HTMLVideoElement) {
+    if (advancingRef.current) return;
+    advancingRef.current = true;
+    video.pause();
+    setProgress(1);
+    if (index < reels.length - 1) goTo(index + 1);
+    else {
+      const start = reels[index]?.startSeconds ?? 0;
+      video.currentTime = start;
+      advancingRef.current = false;
+      void video.play();
+    }
   }
 
   function revealControls(autoHide = true) {
@@ -174,10 +227,10 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
   return (
     <main className="vertical-reels-page">
       <div className="vertical-reel-feed" ref={feedRef} onScroll={handleScroll}>
-        {items.map((item, index) => {
+        {reels.map((item, index) => {
           const shouldLoad = Math.abs(index - active) <= 1;
           return (
-          <article className="vertical-reel" data-index={index} key={item.id} ref={(node) => { cardsRef.current[index] = node; }}>
+          <article className="vertical-reel" data-index={index} key={item.reelKey} ref={(node) => { cardsRef.current[index] = node; }}>
             <div className={`vertical-reel-frame ${controlsVisible && index === active ? "controls-visible" : "controls-hidden"}`} onClick={() => handleFrameTap(index)}>
               <video
                 ref={(node) => { videosRef.current[index] = node; }}
@@ -190,21 +243,30 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
                 onLoadStart={() => { if (index === active) setLoading(true); }}
                 onWaiting={() => { if (index === active) setLoading(true); }}
                 onSeeking={() => { if (index === active) setLoading(true); }}
+                onLoadedMetadata={(event) => registerDuration(item, event.currentTarget)}
                 onCanPlay={(event) => {
                   if (index !== active || !event.currentTarget.paused) return;
+                  registerDuration(item, event.currentTarget);
                   void event.currentTarget.play().catch(() => { setShowPlay(true); setLoading(false); });
                 }}
-                onPlaying={() => { setLoading(false); setPlayingId(item.id); setShowPlay(false); setVideoError(""); revealControls(); recordView(item); }}
-                onPause={() => { if (index === active) { setPlayingId(undefined); setShowPlay(true); revealControls(false); } }}
+                onPlaying={() => { advancingRef.current = false; setLoading(false); setPlayingId(item.id); setShowPlay(false); setVideoError(""); revealControls(); recordView(item); }}
+                onPause={() => { if (index === active && !advancingRef.current) { setPlayingId(undefined); setShowPlay(true); revealControls(false); } }}
                 onError={() => { if (index === active) { setLoading(false); setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); revealControls(false); } }}
-                onTimeUpdate={(event) => { if (index === active) { const video = event.currentTarget; setProgress(video.duration ? video.currentTime / video.duration : 0); } }}
-                onEnded={() => index < items.length - 1 ? goTo(index + 1) : void videosRef.current[index]?.play()}
+                onTimeUpdate={(event) => {
+                  if (index !== active) return;
+                  const video = event.currentTarget;
+                  const end = item.endSeconds ?? video.duration;
+                  const length = end - item.startSeconds;
+                  setProgress(length > 0 ? Math.max(0, Math.min(1, (video.currentTime - item.startSeconds) / length)) : 0);
+                  if (item.endSeconds && video.currentTime >= item.endSeconds - 0.12) advanceFrom(index, video);
+                }}
+                onEnded={(event) => advanceFrom(index, event.currentTarget)}
               >
                 {item.subtitles.map((subtitle) => subtitle.sourceUrl && <track default={subtitle === item.subtitles[0]} key={subtitle.id} kind="subtitles" label={subtitle.label} src={subtitle.sourceUrl} srcLang={subtitle.language} />)}
               </video>
               <div className="vertical-reel-shade" />
               <header className="vertical-reel-top" onClick={(event) => event.stopPropagation()}>
-                <button type="button" aria-label="Буцах" onClick={() => router.push("/vertical")}>←</button><b><i>Х</i>ҮРЭЭ</b><span>{index + 1} / {items.length}</span>
+                <button type="button" aria-label="Буцах" onClick={() => router.push("/vertical")}>←</button><b><i>Х</i>ҮРЭЭ</b><span>{item.part + 1} / {item.partCount}</span>
               </header>
               {loading && index === active && !videoError && <div className="vertical-reel-loading" role="status"><i /><span>Видео ачаалж байна…</span></div>}
               {showPlay && !loading && index === active && <button className="vertical-reel-center-play" type="button" aria-label="Тоглуулах" onClick={(event) => { event.stopPropagation(); togglePlayback(index); }}>▶</button>}
@@ -214,11 +276,11 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
                 <Link href={`/movie/${encodeURIComponent(item.slug)}`}><span>ⓘ</span><small>Тухай</small></Link>
               </div>
               <div className="vertical-reel-copy">
-                <p>БОСОО ДРАМА · {item.age} · {item.duration}</p>
+                <p>БОСОО ДРАМА · {item.part + 1}-Р ХЭСЭГ · {item.age}</p>
                 <h1>{item.title}</h1>
-                <span>{item.synopsis}</span>
+                <span>{item.partCount} хэсэг · хэсэг бүр {item.segmentMinutes} минут</span>
               </div>
-              {index < items.length - 1 && <button className="vertical-reel-next" type="button" onClick={(event) => { event.stopPropagation(); goTo(index + 1); }}>Дараагийнх <i>⌄</i></button>}
+              {index < reels.length - 1 && <button className="vertical-reel-next" type="button" onClick={(event) => { event.stopPropagation(); goTo(index + 1); }}>Дараагийнх <i>⌄</i></button>}
               {videoError && index === active && <button className="vertical-reel-error" type="button" onClick={(event) => { event.stopPropagation(); setVideoError(""); togglePlayback(index); }}>{videoError}</button>}
               <div className="vertical-reel-progress"><i style={{ transform: `scaleX(${progress})` }} /></div>
             </div>

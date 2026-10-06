@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       console.error("R2 multipart complete failed", { key, error });
       return Response.json({ error: "R2 файл нэгтгэхэд алдаа гарлаа. Дахин оролдоно уу." }, { status: 502 });
     }
-    const movie = (body.movie ?? {}) as { title?: string; synopsis?: string; categories?: string[]; filename?: string; contentType?: string; bytes?: number; releaseYear?: number; duration?: string; rating?: number; ageRating?: string; featured?: boolean; kind?: string; seriesId?: string; seasonId?: string; seasonNumber?: number; episodeNumber?: number };
+    const movie = (body.movie ?? {}) as { title?: string; synopsis?: string; categories?: string[]; filename?: string; contentType?: string; bytes?: number; releaseYear?: number; duration?: string; rating?: number; ageRating?: string; featured?: boolean; kind?: string; seriesId?: string; seasonId?: string; seasonNumber?: number; episodeNumber?: number; verticalSegmentMinutes?: number };
     if (!movie.title?.trim() || !movie.synopsis?.trim() || !Array.isArray(movie.categories) || !movie.categories.length) { await deleteR2Object(key); await db.from("orphan_uploads").delete().eq("object_key", key); return Response.json({ error: "Киноны мэдээлэл дутуу." }, { status: 400 }); }
     if (movie.kind === "series" && movie.seriesId) {
       try {
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     }
     let slug = slugify(movie.title); const collision = await db.from("movies").select("id").eq("slug", slug).maybeSingle(); if (collision.data) slug += `-${crypto.randomUUID().slice(0, 8)}`;
     const normalizedType = key.toLowerCase().endsWith(".ts") ? "video/mp2t" : key.toLowerCase().endsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "video/mp4";
-    const payload = { title: movie.title.trim(), slug, description: movie.synopsis.trim(), video_key: key, original_filename: movie.filename, content_type: normalizedType, bytes: Number(movie.bytes), release_year: Number(movie.releaseYear) || new Date().getFullYear(), duration: movie.duration || null, rating: Number(movie.rating) || 0, age_rating: movie.ageRating || "13+", featured: Boolean(movie.featured), status: "published", kind: movie.kind === "series" ? "series" : "movie", series_id: movie.seriesId || null, season_id: movie.seasonId || null, season_number: movie.seasonNumber || null, episode_number: movie.episodeNumber || null, created_by: user.id === "admin-password" ? null : user.id };
+    const payload = { title: movie.title.trim(), slug, description: movie.synopsis.trim(), video_key: key, original_filename: movie.filename, content_type: normalizedType, bytes: Number(movie.bytes), release_year: Number(movie.releaseYear) || new Date().getFullYear(), duration: movie.verticalSegmentMinutes ? `${movie.verticalSegmentMinutes === 5 ? 5 : 3} минутын хэсэг` : movie.duration || null, rating: Number(movie.rating) || 0, age_rating: movie.ageRating || "13+", featured: Boolean(movie.featured), status: "published", kind: movie.kind === "series" ? "series" : "movie", series_id: movie.seriesId || null, season_id: movie.seasonId || null, season_number: movie.seasonNumber || null, episode_number: movie.episodeNumber || null, created_by: user.id === "admin-password" ? null : user.id };
     let record: { id: string; slug: string; status: string; video_key: string } | null = null;
     let insertError: { message: string; code?: string } | null = null;
     for (let attempt = 0; attempt < 3 && !record; attempt += 1) {

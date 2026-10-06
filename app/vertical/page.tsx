@@ -20,6 +20,7 @@ export default async function VerticalDramaPage() {
     synopsis: item.synopsis,
     age: item.age,
     duration: item.duration,
+    segmentMinutes: item.verticalSegmentMinutes ?? 3,
     posterUrl: item.posterUrl,
     videoUrl: await signedR2PlaybackUrl(item.videoKey!),
     subtitles: (item.subtitles ?? []).map(({ id, label, language, sourceUrl }) => ({ id, label, language, sourceUrl })),
