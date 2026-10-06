@@ -27,6 +27,9 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
   const recordedRef = useRef(new Set<string>());
   const liveSessionRef = useRef<string | undefined>(undefined);
   const controlsTimerRef = useRef<number | undefined>(undefined);
+  const scrollFrameRef = useRef<number | undefined>(undefined);
+  const lastScrollAtRef = useRef(0);
+  const activeRef = useRef(0);
   const [active, setActive] = useState(0);
   const [muted, setMuted] = useState(true);
   const [playingId, setPlayingId] = useState<string>();
@@ -34,24 +37,7 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
   const [showPlay, setShowPlay] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [videoError, setVideoError] = useState("");
-
-  useEffect(() => {
-    const root = feedRef.current;
-    if (!root) return;
-    const observer = new IntersectionObserver((entries) => {
-      const visible = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-      const index = Number((visible?.target as HTMLElement | undefined)?.dataset.index);
-      if (Number.isInteger(index)) {
-        setActive(index);
-        setControlsVisible(true);
-        setVideoError("");
-      }
-    }, { root, threshold: [0.55, 0.75, 0.9] });
-    cardsRef.current.forEach((card) => { if (card) observer.observe(card); });
-    return () => observer.disconnect();
-  }, [items.length]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     videosRef.current.forEach((video, index) => {
@@ -62,6 +48,7 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
         void video.play().catch((error: unknown) => {
           if (error instanceof DOMException && error.name === "AbortError") return;
           setShowPlay(true);
+          setLoading(false);
         });
       }
       else video.pause();
@@ -97,7 +84,29 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
 
   useEffect(() => () => {
     if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
+    if (scrollFrameRef.current) window.cancelAnimationFrame(scrollFrameRef.current);
   }, []);
+
+  function handleScroll() {
+    const root = feedRef.current;
+    if (!root) return;
+    lastScrollAtRef.current = Date.now();
+    if (scrollFrameRef.current) window.cancelAnimationFrame(scrollFrameRef.current);
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      const pageHeight = root.clientHeight;
+      if (!pageHeight) return;
+      const next = Math.max(0, Math.min(items.length - 1, Math.round(root.scrollTop / pageHeight)));
+      if (next === activeRef.current) return;
+      activeRef.current = next;
+      setActive(next);
+      setLoading(true);
+      setPlayingId(undefined);
+      setShowPlay(false);
+      setProgress(0);
+      setControlsVisible(true);
+      setVideoError("");
+    });
+  }
 
   function goTo(index: number) {
     cardsRef.current[index]?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -119,6 +128,7 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
   }
 
   function handleFrameTap(index: number) {
+    if (Date.now() - lastScrollAtRef.current < 300) return;
     if (!controlsVisible) { revealControls(); return; }
     togglePlayback(index);
   }
@@ -147,22 +157,30 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
 
   return (
     <main className="vertical-reels-page">
-      <div className="vertical-reel-feed" ref={feedRef}>
-        {items.map((item, index) => (
+      <div className="vertical-reel-feed" ref={feedRef} onScroll={handleScroll}>
+        {items.map((item, index) => {
+          const shouldLoad = Math.abs(index - active) <= 1;
+          return (
           <article className="vertical-reel" data-index={index} key={item.id} ref={(node) => { cardsRef.current[index] = node; }}>
             <div className={`vertical-reel-frame ${controlsVisible && index === active ? "controls-visible" : "controls-hidden"}`} onClick={() => handleFrameTap(index)}>
               <video
                 ref={(node) => { videosRef.current[index] = node; }}
-                src={item.videoUrl}
+                src={shouldLoad ? item.videoUrl : undefined}
                 poster={item.posterUrl}
-                autoPlay={index === 0}
+                autoPlay={index === active}
                 playsInline
                 muted={muted}
-                preload={index < 2 ? "metadata" : "none"}
-                onCanPlay={(event) => { if (index === active && event.currentTarget.paused) void event.currentTarget.play().catch(() => setShowPlay(true)); }}
-                onPlay={() => { setPlayingId(item.id); setShowPlay(false); setVideoError(""); revealControls(); recordView(item); }}
+                preload={index === active ? "auto" : "metadata"}
+                onLoadStart={() => { if (index === active) setLoading(true); }}
+                onWaiting={() => { if (index === active) setLoading(true); }}
+                onSeeking={() => { if (index === active) setLoading(true); }}
+                onCanPlay={(event) => {
+                  if (index !== active || !event.currentTarget.paused) return;
+                  void event.currentTarget.play().catch(() => { setShowPlay(true); setLoading(false); });
+                }}
+                onPlaying={() => { setLoading(false); setPlayingId(item.id); setShowPlay(false); setVideoError(""); revealControls(); recordView(item); }}
                 onPause={() => { if (index === active) { setPlayingId(undefined); setShowPlay(true); revealControls(false); } }}
-                onError={() => { if (index === active) { setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); revealControls(false); } }}
+                onError={() => { if (index === active) { setLoading(false); setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); revealControls(false); } }}
                 onTimeUpdate={(event) => { if (index === active) { const video = event.currentTarget; setProgress(video.duration ? video.currentTime / video.duration : 0); } }}
                 onEnded={() => index < items.length - 1 ? goTo(index + 1) : void videosRef.current[index]?.play()}
               >
@@ -172,7 +190,8 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
               <header className="vertical-reel-top" onClick={(event) => event.stopPropagation()}>
                 <button type="button" aria-label="Буцах" onClick={() => router.push("/vertical")}>←</button><b><i>Х</i>ҮРЭЭ</b><span>{index + 1} / {items.length}</span>
               </header>
-              {showPlay && index === active && <button className="vertical-reel-center-play" type="button" aria-label="Тоглуулах" onClick={(event) => { event.stopPropagation(); togglePlayback(index); }}>▶</button>}
+              {loading && index === active && !videoError && <div className="vertical-reel-loading" role="status"><i /><span>Видео ачаалж байна…</span></div>}
+              {showPlay && !loading && index === active && <button className="vertical-reel-center-play" type="button" aria-label="Тоглуулах" onClick={(event) => { event.stopPropagation(); togglePlayback(index); }}>▶</button>}
               <div className="vertical-reel-actions" onClick={(event) => event.stopPropagation()}>
                 <button type="button" aria-label={muted ? "Дуу асаах" : "Дуу хаах"} onClick={() => setMuted((value) => !value)}><span>{muted ? "⌁" : "◖"}</span><small>{muted ? "Дуу" : "Асаалттай"}</small></button>
                 <button type="button" aria-label="Дэлгэц дүүргэх" onClick={() => void enterFullscreen(index)}><span>⛶</span><small>Дэлгэц</small></button>
@@ -188,7 +207,8 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
               <div className="vertical-reel-progress"><i style={{ transform: `scaleX(${progress})` }} /></div>
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
     </main>
   );
