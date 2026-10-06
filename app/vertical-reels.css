@@ -4,7 +4,7 @@ body:has(.vertical-reels-page) .feedback-chat,body:has(.vertical-reels-page) .in
 .vertical-reel-feed{height:100dvh;overflow-y:auto;overflow-x:hidden;scroll-snap-type:y mandatory;scroll-behavior:smooth;overscroll-behavior-y:contain;scrollbar-width:none}
 .vertical-reel-feed::-webkit-scrollbar{display:none}
 .vertical-reel{height:100dvh;min-height:100dvh;display:grid;place-items:center;scroll-snap-align:start;scroll-snap-stop:always}
-.vertical-reel-frame{position:relative;width:min(100vw,calc(100dvh * 9 / 16),500px);height:100dvh;overflow:hidden;background:#050505;box-shadow:0 0 80px #000;isolation:isolate;touch-action:pan-y;cursor:pointer}
+.vertical-reel-frame{position:relative;width:min(100vw,calc(100dvh * 9 / 16),500px);height:100dvh;overflow:hidden;background:#050505;box-shadow:0 0 80px #000;isolation:isolate;touch-action:pan-y;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .vertical-reel-frame video{position:absolute;z-index:0;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
 .vertical-reel-shade{position:absolute;z-index:1;inset:0;pointer-events:none;background:linear-gradient(180deg,#000b 0,transparent 22%,transparent 55%,#000e 91%,#000 100%)}
 .vertical-reel-top{position:absolute;z-index:4;top:0;left:0;right:0;display:grid;grid-template-columns:40px 1fr 40px;align-items:center;padding:max(14px,env(safe-area-inset-top)) 15px 10px;text-shadow:0 2px 12px #000}
@@ -13,6 +13,7 @@ body:has(.vertical-reels-page) .feedback-chat,body:has(.vertical-reels-page) .in
 .vertical-reel-center-play{position:absolute;z-index:5;top:50%;left:50%;display:grid;width:66px;height:66px;place-items:center;transform:translate(-50%,-50%);border:1px solid #ffffff45;border-radius:50%;padding-left:5px;background:#08080899;color:#fff;font-size:24px;backdrop-filter:blur(12px);cursor:pointer}
 .vertical-reel-loading{position:absolute;z-index:6;top:50%;left:50%;display:grid;justify-items:center;gap:10px;transform:translate(-50%,-50%);color:#eee;font-size:9px;font-weight:800;letter-spacing:.04em;text-shadow:0 2px 8px #000;pointer-events:none}.vertical-reel-loading i{width:34px;height:34px;border:3px solid #ffffff35;border-top-color:#ed111d;border-radius:50%;animation:vertical-reel-spin .75s linear infinite}
 .vertical-reel-speed{position:absolute;z-index:8;top:11%;left:50%;transform:translateX(-50%);border:1px solid #ffffff3d;border-radius:18px;padding:7px 13px;background:#080808a8;color:#fff;font-size:13px;font-weight:900;letter-spacing:.04em;box-shadow:0 5px 24px #0008;backdrop-filter:blur(10px);pointer-events:none}
+.vertical-reel-seek-feedback{position:absolute;z-index:8;top:50%;display:grid;justify-items:center;gap:2px;transform:translateY(-50%);color:#fff;text-shadow:0 2px 10px #000;pointer-events:none;animation:vertical-reel-seek-pop .65s ease both}.vertical-reel-seek-feedback.left{left:14%}.vertical-reel-seek-feedback.right{right:14%}.vertical-reel-seek-feedback b{font-size:29px;line-height:.8}.vertical-reel-seek-feedback span{font-size:10px;font-weight:900}
 .vertical-reel-actions{position:absolute;z-index:4;right:12px;bottom:max(130px,calc(env(safe-area-inset-bottom) + 112px));display:flex;flex-direction:column;gap:17px;align-items:center}
 .vertical-reel-actions button,.vertical-reel-actions a{display:grid;justify-items:center;gap:4px;border:0;padding:0;background:transparent;color:#fff;text-shadow:0 2px 8px #000;cursor:pointer}
 .vertical-reel-actions span{display:grid;width:42px;height:42px;place-items:center;border:1px solid #ffffff2d;border-radius:50%;background:#0a0a0a7d;font-size:20px;backdrop-filter:blur(10px)}
@@ -32,5 +33,6 @@ body:has(.vertical-reels-page) .feedback-chat,body:has(.vertical-reels-page) .in
 .vertical-reels-empty{display:grid;place-items:center;text-align:center}.vertical-reels-empty>a{position:absolute;top:24px;left:24px}.vertical-reels-empty>div{display:grid;gap:10px;padding:24px}.vertical-reels-empty b{font-size:24px}.vertical-reels-empty span{color:#888;font-size:12px}
 @keyframes vertical-reel-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
 @keyframes vertical-reel-spin{to{transform:rotate(360deg)}}
+@keyframes vertical-reel-seek-pop{0%{opacity:0;scale:.7}22%{opacity:1;scale:1.08}70%{opacity:1;scale:1}100%{opacity:0;scale:.9}}
 @media(max-width:560px){.vertical-reel-frame{width:100vw}.vertical-reel-actions{right:10px}.vertical-reel-copy{left:15px}.vertical-reel-top{padding-left:12px;padding-right:12px}}
 @media(prefers-reduced-motion:reduce){.vertical-reel-feed{scroll-behavior:auto}.vertical-reel-next i{animation:none}.vertical-reel-loading i{animation-duration:1.5s}}

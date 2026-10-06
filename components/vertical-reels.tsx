@@ -41,6 +41,9 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
   const pointerStartYRef = useRef<number | undefined>(undefined);
   const longPressTimerRef = useRef<number | undefined>(undefined);
   const longPressTriggeredRef = useRef(false);
+  const tapTimerRef = useRef<number | undefined>(undefined);
+  const lastTapRef = useRef<{ at: number; side: "left" | "right" } | undefined>(undefined);
+  const seekFeedbackTimerRef = useRef<number | undefined>(undefined);
   const lastGestureAtRef = useRef(0);
   const [part, setPart] = useState(Math.max(0, Math.floor(initialPart) - 1));
   const [partCount, setPartCount] = useState(0);
@@ -55,6 +58,7 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
   const [partsOpen, setPartsOpen] = useState(false);
   const [cleanView, setCleanView] = useState(false);
   const [speeding, setSpeeding] = useState(false);
+  const [seekFeedback, setSeekFeedback] = useState<{ text: string; side: "left" | "right" }>();
   const segmentSeconds = item.segmentMinutes * 60;
   const startSeconds = part * segmentSeconds;
   const endSeconds = duration ? Math.min(duration, (part + 1) * segmentSeconds) : 0;
@@ -128,6 +132,8 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
       stopPlayback();
       if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
       if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+      if (tapTimerRef.current) window.clearTimeout(tapTimerRef.current);
+      if (seekFeedbackTimerRef.current) window.clearTimeout(seekFeedbackTimerRef.current);
       if (video) video.playbackRate = 1;
     };
   }, []);
@@ -235,6 +241,41 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
     selectPart(deltaY > 0 ? part + 1 : part - 1);
   }
 
+  function seekBy(seconds: number, side: "left" | "right") {
+    const video = videoRef.current;
+    if (!video || !Number.isFinite(video.duration)) return;
+    const segmentEnd = endSeconds || video.duration;
+    video.currentTime = Math.max(startSeconds, Math.min(segmentEnd, video.currentTime + seconds));
+    setSeekFeedback({ text: seconds > 0 ? "+5 сек" : "−5 сек", side });
+    if (seekFeedbackTimerRef.current) window.clearTimeout(seekFeedbackTimerRef.current);
+    seekFeedbackTimerRef.current = window.setTimeout(() => setSeekFeedback(undefined), 650);
+  }
+
+  function handleFrameTap(clientX: number) {
+    if (Date.now() - lastGestureAtRef.current < 300) return;
+    const frame = frameRef.current;
+    if (!frame) return;
+    const bounds = frame.getBoundingClientRect();
+    const side = clientX < bounds.left + bounds.width / 2 ? "left" : "right";
+    const now = Date.now();
+    const previous = lastTapRef.current;
+    if (previous && previous.side === side && now - previous.at < 320) {
+      if (tapTimerRef.current) window.clearTimeout(tapTimerRef.current);
+      tapTimerRef.current = undefined;
+      lastTapRef.current = undefined;
+      seekBy(side === "right" ? 5 : -5, side);
+      return;
+    }
+    lastTapRef.current = { at: now, side };
+    if (tapTimerRef.current) window.clearTimeout(tapTimerRef.current);
+    tapTimerRef.current = window.setTimeout(() => {
+      lastTapRef.current = undefined;
+      if (cleanView) { setCleanView(false); revealControls(false); return; }
+      if (!controlsVisible) { revealControls(); return; }
+      togglePlayback();
+    }, 260);
+  }
+
   return (
     <main className="vertical-reels-page">
       <article className="vertical-reel vertical-reel-single" onPointerDown={(event) => {
@@ -245,12 +286,7 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
         const startY = pointerStartYRef.current;
         if (startY !== undefined && Math.abs(startY - event.clientY) > 12) stopLongPress();
       }} onPointerUp={(event) => finishPointer(event.clientY)} onPointerCancel={() => { pointerStartYRef.current = undefined; longPressTriggeredRef.current = false; stopLongPress(); }} onWheel={(event) => handleWheel(event.deltaY)}>
-        <section ref={frameRef} className={`vertical-reel-frame ${controlsVisible ? "controls-visible" : "controls-hidden"} ${cleanView ? "clean-view" : ""}`} onClick={() => {
-          if (Date.now() - lastGestureAtRef.current < 300) return;
-          if (cleanView) { setCleanView(false); revealControls(false); return; }
-          if (!controlsVisible) { revealControls(); return; }
-          togglePlayback();
-        }}>
+        <section ref={frameRef} className={`vertical-reel-frame ${controlsVisible ? "controls-visible" : "controls-hidden"} ${cleanView ? "clean-view" : ""}`} onClick={(event) => handleFrameTap(event.clientX)} onContextMenu={(event) => event.preventDefault()} onDragStart={(event) => event.preventDefault()}>
           <video ref={videoRef} src={item.videoUrl} poster={item.posterUrl} autoPlay playsInline muted={muted} preload="auto" onLoadStart={() => setLoading(true)} onWaiting={() => setLoading(true)} onSeeking={() => setLoading(true)} onSeeked={() => { advancingRef.current = false; setLoading(false); }} onLoadedMetadata={(event) => handleMetadata(event.currentTarget)} onCanPlay={(event) => { handleMetadata(event.currentTarget); if (event.currentTarget.paused) void event.currentTarget.play().catch(() => { setLoading(false); setShowPlay(true); }); }} onPlaying={() => { advancingRef.current = false; setLoading(false); setPlaying(true); setShowPlay(false); setVideoError(""); revealControls(); recordView(); }} onPause={() => { setPlaying(false); if (!advancingRef.current) { setShowPlay(true); revealControls(false); } }} onError={() => { setLoading(false); setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); revealControls(false); }} onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget)} onEnded={(event) => handleTimeUpdate(event.currentTarget)}>
             {item.subtitles.map((subtitle) => subtitle.sourceUrl && <track default={subtitle === item.subtitles[0]} key={subtitle.id} kind="subtitles" label={subtitle.label} src={subtitle.sourceUrl} srcLang={subtitle.language} />)}
           </video>
@@ -258,6 +294,7 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
           <header className="vertical-reel-top" onClick={(event) => event.stopPropagation()}><button type="button" aria-label="Буцах" onClick={() => router.push("/vertical")}>←</button><Link href="/" aria-label="Нүүр хуудас"><i>Х</i>ҮРЭЭ</Link><span>{part + 1} / {partCount || "…"}</span></header>
           {loading && !videoError && <div className="vertical-reel-loading" role="status"><i /><span>Видео ачаалж байна…</span></div>}
           {speeding && <div className="vertical-reel-speed" role="status">2×</div>}
+          {seekFeedback && <div className={`vertical-reel-seek-feedback ${seekFeedback.side}`} role="status"><b>{seekFeedback.side === "right" ? "»" : "«"}</b><span>{seekFeedback.text}</span></div>}
           {showPlay && !loading && <button className="vertical-reel-center-play" type="button" aria-label="Тоглуулах" onClick={(event) => { event.stopPropagation(); togglePlayback(); }}>▶</button>}
           <div className="vertical-reel-actions" onClick={(event) => event.stopPropagation()}>
             <button type="button" aria-label={muted ? "Дуу асаах" : "Дуу хаах"} onClick={() => setMuted((value) => !value)}><span>{muted ? "⌁" : "◖"}</span><small>{muted ? "Дуу" : "Асаалттай"}</small></button>
