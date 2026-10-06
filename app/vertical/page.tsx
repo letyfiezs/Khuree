@@ -1,34 +1,29 @@
-import { CatalogGrid } from "@/components/catalog-grid";
-import { SiteHeader } from "@/components/site-header";
-import { requireUser } from "@/lib/auth/local-auth";
+import { VerticalReels, type VerticalReelItem } from "@/components/vertical-reels";
+import { requireDeviceAccess, requireUser, requireWatchAccess } from "@/lib/auth/local-auth";
 import { getCatalog } from "@/lib/catalog";
+import { signedR2PlaybackUrl } from "@/lib/r2";
 import { isVerticalDrama } from "@/lib/vertical-drama";
 
 export const dynamic = "force-dynamic";
 
 export default async function VerticalDramaPage() {
-  await requireUser("/vertical");
+  const user = await requireUser("/vertical");
+  await requireDeviceAccess(user, "/vertical");
+  requireWatchAccess(user, "vertical");
   const items = (await getCatalog("movie")).filter(
-    (item) => item.age !== "18+" && isVerticalDrama(item),
+    (item) => item.age !== "18+" && isVerticalDrama(item) && item.videoKey,
   );
+  const reels = await Promise.all(items.map(async (item): Promise<VerticalReelItem> => ({
+    id: item.id,
+    slug: item.slug,
+    title: item.title,
+    synopsis: item.synopsis,
+    age: item.age,
+    duration: item.duration,
+    posterUrl: item.posterUrl,
+    videoUrl: await signedR2PlaybackUrl(item.videoKey!),
+    subtitles: (item.subtitles ?? []).map(({ id, label, language, sourceUrl }) => ({ id, label, language, sourceUrl })),
+  })));
 
-  return (
-    <main>
-      <SiteHeader />
-      <section className="catalog-page">
-        <div className="catalog-banner movie-banner">
-          <p className="section-kicker">БОСООГООР ҮЗЭХ</p>
-          <h1>Босоо драма</h1>
-          <p>Утасны дэлгэцэд зориулсан босоо драмуудыг нэг дороос үзээрэй.</p>
-        </div>
-        <div className="catalog-body">
-          <div className="catalog-title">
-            <h2>Бүх босоо драма</h2>
-            <span>{items.length} бүтээл</span>
-          </div>
-          <CatalogGrid items={items} />
-        </div>
-      </section>
-    </main>
-  );
+  return <VerticalReels items={reels} />;
 }

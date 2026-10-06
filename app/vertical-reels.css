@@ -1,0 +1,25 @@
+html:has(.vertical-reels-page),body:has(.vertical-reels-page){height:100%;overflow:hidden;overscroll-behavior:none;background:#000}
+body:has(.vertical-reels-page) .feedback-chat,body:has(.vertical-reels-page) .install-app-button{display:none!important}
+.vertical-reels-page{position:fixed;z-index:150;inset:0;background:radial-gradient(circle at 50% 40%,#261014,#000 48%);color:#fff}
+.vertical-reel-feed{height:100dvh;overflow-y:auto;overflow-x:hidden;scroll-snap-type:y mandatory;scroll-behavior:smooth;overscroll-behavior-y:contain;scrollbar-width:none}
+.vertical-reel-feed::-webkit-scrollbar{display:none}
+.vertical-reel{height:100dvh;min-height:100dvh;display:grid;place-items:center;scroll-snap-align:start;scroll-snap-stop:always}
+.vertical-reel-frame{position:relative;width:min(100vw,calc(100dvh * 9 / 16),500px);height:100dvh;overflow:hidden;background:#050505;box-shadow:0 0 80px #000;isolation:isolate;touch-action:pan-y;cursor:pointer}
+.vertical-reel-frame video{position:absolute;z-index:0;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+.vertical-reel-shade{position:absolute;z-index:1;inset:0;pointer-events:none;background:linear-gradient(180deg,#000b 0,transparent 22%,transparent 55%,#000e 91%,#000 100%)}
+.vertical-reel-top{position:absolute;z-index:4;top:0;left:0;right:0;display:grid;grid-template-columns:40px 1fr 40px;align-items:center;padding:max(14px,env(safe-area-inset-top)) 15px 10px;text-shadow:0 2px 12px #000}
+.vertical-reel-top>a{display:grid;width:38px;height:38px;place-items:center;border:1px solid #ffffff2b;border-radius:50%;background:#09090970;font-size:22px;backdrop-filter:blur(10px)}
+.vertical-reel-top>b{text-align:center;font-size:15px;letter-spacing:.1em}.vertical-reel-top>b i{color:#ef1621;font-size:22px;font-style:normal}.vertical-reel-top>span{color:#ddd;font-size:9px;font-weight:800;text-align:right}
+.vertical-reel-center-play{position:absolute;z-index:5;top:50%;left:50%;display:grid;width:66px;height:66px;place-items:center;transform:translate(-50%,-50%);border:1px solid #ffffff45;border-radius:50%;padding-left:5px;background:#08080899;color:#fff;font-size:24px;backdrop-filter:blur(12px);cursor:pointer}
+.vertical-reel-actions{position:absolute;z-index:4;right:12px;bottom:max(130px,calc(env(safe-area-inset-bottom) + 112px));display:flex;flex-direction:column;gap:17px;align-items:center}
+.vertical-reel-actions button,.vertical-reel-actions a{display:grid;justify-items:center;gap:4px;border:0;padding:0;background:transparent;color:#fff;text-shadow:0 2px 8px #000;cursor:pointer}
+.vertical-reel-actions span{display:grid;width:42px;height:42px;place-items:center;border:1px solid #ffffff2d;border-radius:50%;background:#0a0a0a7d;font-size:20px;backdrop-filter:blur(10px)}
+.vertical-reel-actions small{font-size:8px;font-weight:800}
+.vertical-reel-copy{position:absolute;z-index:3;left:18px;right:68px;bottom:max(58px,calc(env(safe-area-inset-bottom) + 42px));text-shadow:0 2px 12px #000}
+.vertical-reel-copy p{margin:0 0 7px;color:#ff6670;font-size:8px;font-weight:900;letter-spacing:.13em}.vertical-reel-copy h1{margin:0 0 7px;font-size:clamp(23px,6vw,31px);line-height:1.05}.vertical-reel-copy>span{display:-webkit-box;overflow:hidden;color:#ddd;font-size:11px;line-height:1.45;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.vertical-reel-next{position:absolute;z-index:4;right:12px;bottom:max(61px,calc(env(safe-area-inset-bottom) + 45px));display:grid;justify-items:center;gap:2px;border:0;background:transparent;color:#ddd;font-size:7px;font-weight:800;text-transform:uppercase;cursor:pointer}.vertical-reel-next i{font-size:19px;font-style:normal;line-height:.7;animation:vertical-reel-bounce 1.4s ease-in-out infinite}
+.vertical-reel-progress{position:absolute;z-index:5;left:0;right:0;bottom:0;height:3px;background:#ffffff2b}.vertical-reel-progress i{display:block;width:100%;height:100%;transform-origin:left;background:#ed111d;transition:transform .15s linear}
+.vertical-reels-empty{display:grid;place-items:center;text-align:center}.vertical-reels-empty>a{position:absolute;top:24px;left:24px}.vertical-reels-empty>div{display:grid;gap:10px;padding:24px}.vertical-reels-empty b{font-size:24px}.vertical-reels-empty span{color:#888;font-size:12px}
+@keyframes vertical-reel-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
+@media(max-width:560px){.vertical-reel-frame{width:100vw}.vertical-reel-actions{right:10px}.vertical-reel-copy{left:15px}.vertical-reel-top{padding-left:12px;padding-right:12px}}
+@media(prefers-reduced-motion:reduce){.vertical-reel-feed{scroll-behavior:auto}.vertical-reel-next i{animation:none}}

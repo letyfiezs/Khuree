@@ -21,6 +21,7 @@ import "./messages.css";
 import "./messages-notifications.css";
 import "./admin-chat.css";
 import "./admin-chat-badge.css";
+import "./vertical-reels.css";
 
 const geist = Geist({
   variable: "--font-geist",
