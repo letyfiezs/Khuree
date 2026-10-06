@@ -1186,7 +1186,7 @@ export function AdminMovies({
             </label>
             <div className="pricing-fields">
               <label className="check-label"><input type="checkbox" checked={editIsFree} onChange={(event) => setEditIsFree(event.target.checked)} /> Үнэгүй үзүүлэх</label>
-              <label>72 цагийн түрээсийн үнэ<input type="number" min="1" step="100" disabled={editIsFree} value={editRentalPrice} onChange={(event) => setEditRentalPrice(Number(event.target.value))} /></label>
+              <label>72 цагийн түрээсийн үнэ<input type="number" min="100" step="100" disabled={editIsFree} value={editRentalPrice} onChange={(event) => setEditRentalPrice(Number(event.target.value))} /></label>
             </div>
             <fieldset className="trailer-fields"><legend>Trailer</legend><label>Trailer видео (H.264 MP4)<input type="file" accept="video/mp4" onChange={(event) => setEditTrailerFile(event.target.files?.[0] ?? null)} /><small>{editMovie.trailerKey ? "Одоогийн trailer-ийг шинэ файлаар солино." : "Түрээслэхээс өмнө үзэх тусдаа видео."}</small></label><label>Хугацаа (5–10 минут)<input type="number" min="5" max="10" value={editTrailerMinutes} onChange={(event) => setEditTrailerMinutes(Math.max(5, Math.min(10, Number(event.target.value))))} /></label>{editTrailerProgress > 0 && <div className="trailer-progress"><i style={{ width: `${editTrailerProgress}%` }} /><span>{editTrailerProgress}%</span></div>}</fieldset>
             {editMovie.kind === "series" && (

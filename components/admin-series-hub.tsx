@@ -164,7 +164,7 @@ export function AdminSeriesHub({
                 <option>18+</option>
               </select>
             </label>
-            <div className="pricing-fields"><label className="check-label"><input type="checkbox" checked={isFree} onChange={(event) => setIsFree(event.target.checked)} /> Үнэгүй үзүүлэх</label><label>72 цагийн түрээсийн үнэ<input type="number" min="1" step="100" disabled={isFree} value={rentalPrice} onChange={(event) => setRentalPrice(Number(event.target.value))} /></label></div>
+            <div className="pricing-fields"><label className="check-label"><input type="checkbox" checked={isFree} onChange={(event) => setIsFree(event.target.checked)} /> Үнэгүй үзүүлэх</label><label>72 цагийн түрээсийн үнэ<input type="number" min="100" step="100" disabled={isFree} value={rentalPrice} onChange={(event) => setRentalPrice(Number(event.target.value))} /></label></div>
             <fieldset>
               <legend>Ангилал</legend>
               <div className="category-picker">
@@ -206,7 +206,7 @@ export function AdminSeriesHub({
             <label>Цувралын нэр<input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} /></label>
             <label>Тайлбар<textarea value={editSynopsis} onChange={(event) => setEditSynopsis(event.target.value)} /></label>
             <label>Насны ангилал<select value={editAge} onChange={(event) => setEditAge(event.target.value)}><option>Бүх нас</option><option>6+</option><option>13+</option><option>16+</option><option>18+</option></select></label>
-            <div className="pricing-fields"><label className="check-label"><input type="checkbox" checked={editIsFree} onChange={(event) => setEditIsFree(event.target.checked)} /> Үнэгүй үзүүлэх</label><label>72 цагийн түрээсийн үнэ<input type="number" min="1" step="100" disabled={editIsFree} value={editRentalPrice} onChange={(event) => setEditRentalPrice(Number(event.target.value))} /></label></div>
+            <div className="pricing-fields"><label className="check-label"><input type="checkbox" checked={editIsFree} onChange={(event) => setEditIsFree(event.target.checked)} /> Үнэгүй үзүүлэх</label><label>72 цагийн түрээсийн үнэ<input type="number" min="100" step="100" disabled={editIsFree} value={editRentalPrice} onChange={(event) => setEditRentalPrice(Number(event.target.value))} /></label></div>
             <fieldset><legend>Ангилал</legend><div className="category-picker">{categories.map((category) => <button type="button" key={category} className={editCategories.includes(category) ? "selected" : ""} onClick={() => setEditCategories((current) => current.includes(category) ? current.filter((item) => item !== category) : [...current, category])}>{editCategories.includes(category) ? "✓ " : "+ "}{category}</button>)}</div></fieldset>
             {error && <p className="form-error">⚠ {error}</p>}
             <div className="modal-actions"><button type="button" onClick={() => setEditing(null)}>Болих</button><button className="primary-button" disabled={saving}>{saving ? "Хадгалж байна…" : "Өөрчлөлт хадгалах"}</button></div>
