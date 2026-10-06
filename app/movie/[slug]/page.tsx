@@ -4,7 +4,6 @@ import { getCatalogItem } from "@/lib/catalog";
 import { SiteHeader } from "@/components/site-header";
 import { requireAdultAccess, requireUser } from "@/lib/auth/local-auth";
 import { DetailBackButton } from "@/components/detail-back-button";
-import { VerticalPartList } from "@/components/vertical-part-list";
 import { isVerticalDrama } from "@/lib/vertical-drama";
 export const dynamic = "force-dynamic";
 export async function generateMetadata({
@@ -79,7 +78,7 @@ export default async function MovieDetail({
             <b>{item.rating ? `★ ${item.rating}` : "ШИНЭ"}</b>
             <span>{item.year}</span>
             <span>{item.age}</span>
-            <span>{item.duration}</span>
+            <span>{isVerticalDrama(item) ? "Бүтэн видео" : item.duration}</span>
             <span className="quality">HD</span>
           </div>
           <p className="hero-copy">{item.synopsis}</p>
@@ -105,18 +104,6 @@ export default async function MovieDetail({
           </div>
         </div>
       </section>
-      {isVerticalDrama(item) && item.videoKey && (
-        <section className="vertical-detail-parts">
-          <div className="vertical-detail-parts-heading">
-            <span>
-              <small>БОСОО ДРАМА</small>
-              <h2>Хэсгүүд</h2>
-            </span>
-            <p>Үзэх хэсгээ шууд сонгоно уу.</p>
-          </div>
-          <VerticalPartList slug={item.slug} />
-        </section>
-      )}
       {item.kind === "series" && item.seriesId && (
         <section className="series-episodes">
           <p className="section-kicker">БҮЛЭГ БА АНГИУД</p>

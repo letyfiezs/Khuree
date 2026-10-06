@@ -11,8 +11,6 @@ export type VerticalReelItem = {
   title: string;
   synopsis: string;
   age: string;
-  duration: string;
-  segmentMinutes: 3 | 5;
   posterUrl?: string;
   videoUrl: string;
   subtitles: { id: string; label: string; language: string; sourceUrl?: string }[];
@@ -20,24 +18,23 @@ export type VerticalReelItem = {
 
 const LIVE_HEARTBEAT_INTERVAL_MS = 15_000;
 
-export function VerticalReels({ items, initialPart = 1 }: { items: VerticalReelItem[]; initialPart?: number }) {
+export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
   const item = items[0];
   if (!item) return (
     <main className="vertical-reels-page vertical-reels-empty">
       <Link href="/">← Нүүр</Link><div><b>Босоо драма алга байна</b><span>Admin хэсгээс “Босоо драма” ангилалтай видео нэмнэ үү.</span></div>
     </main>
   );
-  return <VerticalReelPlayer item={item} initialPart={initialPart} />;
+  return <VerticalReelPlayer item={item} />;
 }
 
-function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; initialPart: number }) {
+function VerticalReelPlayer({ item }: { item: VerticalReelItem }) {
   const router = useRouter();
   const frameRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsTimerRef = useRef<number | undefined>(undefined);
   const liveSessionRef = useRef<string | undefined>(undefined);
   const recordedRef = useRef(false);
-  const advancingRef = useRef(false);
   const pointerStartYRef = useRef<number | undefined>(undefined);
   const longPressTimerRef = useRef<number | undefined>(undefined);
   const longPressTriggeredRef = useRef(false);
@@ -45,9 +42,6 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
   const lastTapRef = useRef<{ at: number; side: "left" | "right" } | undefined>(undefined);
   const seekFeedbackTimerRef = useRef<number | undefined>(undefined);
   const lastGestureAtRef = useRef(0);
-  const [part, setPart] = useState(Math.max(0, Math.floor(initialPart) - 1));
-  const [partCount, setPartCount] = useState(0);
-  const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -55,31 +49,23 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
   const [controlsVisible, setControlsVisible] = useState(true);
   const [loading, setLoading] = useState(true);
   const [videoError, setVideoError] = useState("");
-  const [partsOpen, setPartsOpen] = useState(false);
   const [cleanView, setCleanView] = useState(false);
   const [speeding, setSpeeding] = useState(false);
   const [seekFeedback, setSeekFeedback] = useState<{ text: string; side: "left" | "right" }>();
-  const segmentSeconds = item.segmentMinutes * 60;
-  const startSeconds = part * segmentSeconds;
-  const endSeconds = duration ? Math.min(duration, (part + 1) * segmentSeconds) : 0;
-
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    advancingRef.current = true;
     setLoading(true);
     setShowPlay(false);
     setProgress(0);
     setVideoError("");
-    if (video.readyState >= 1) video.currentTime = startSeconds;
-    else video.load();
-    void video.play().then(() => { advancingRef.current = false; }).catch((error: unknown) => {
+    if (video.readyState === 0) video.load();
+    void video.play().catch((error: unknown) => {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      advancingRef.current = false;
       setLoading(false);
       setShowPlay(true);
     });
-  }, [startSeconds]);
+  }, [item.videoUrl]);
 
   useEffect(() => { if (videoRef.current) videoRef.current.muted = muted; }, [muted]);
 
@@ -101,13 +87,6 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
 
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        event.preventDefault();
-        if (!partCount) return;
-        const next = event.key === "ArrowDown" ? part + 1 : part - 1;
-        const target = Math.max(0, Math.min(partCount - 1, next));
-        if (target !== part) setPart(target);
-      }
       if (event.key === " ") {
         event.preventDefault();
         const video = videoRef.current;
@@ -118,7 +97,7 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
     };
     window.addEventListener("keydown", keyboard);
     return () => window.removeEventListener("keydown", keyboard);
-  }, [part, partCount]);
+  }, []);
 
   useLayoutEffect(() => {
     const video = videoRef.current;
@@ -155,16 +134,6 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
     } catch { /* Ignore invalid old local history. */ }
   }
 
-  function selectPart(next: number) {
-    if (!partCount) return;
-    const target = Math.max(0, Math.min(partCount - 1, next));
-    if (target === part) { setPartsOpen(false); return; }
-    advancingRef.current = true;
-    setPart(target);
-    setPartsOpen(false);
-    setControlsVisible(true);
-  }
-
   function togglePlayback() {
     const video = videoRef.current;
     if (!video) return;
@@ -174,32 +143,12 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
     } else video.pause();
   }
 
-  function handleMetadata(video: HTMLVideoElement) {
-    if (!Number.isFinite(video.duration) || video.duration <= 0) return;
-    const nextDuration = video.duration;
-    const nextCount = Math.max(1, Math.ceil(nextDuration / segmentSeconds));
-    setDuration(nextDuration);
-    setPartCount(nextCount);
-    if (part >= nextCount) setPart(nextCount - 1);
-    else if (Math.abs(video.currentTime - startSeconds) > 0.25) video.currentTime = startSeconds;
-  }
-
   function handleTimeUpdate(video: HTMLVideoElement) {
-    const end = endSeconds || video.duration;
-    const length = end - startSeconds;
-    setProgress(length > 0 ? Math.max(0, Math.min(1, (video.currentTime - startSeconds) / length)) : 0);
-    if (!duration || video.currentTime < end - 0.12 || advancingRef.current) return;
-    advancingRef.current = true;
-    if (part < partCount - 1) setPart((current) => current + 1);
-    else {
-      video.currentTime = startSeconds;
-      advancingRef.current = false;
-      void video.play();
-    }
+    setProgress(video.duration > 0 ? Math.max(0, Math.min(1, video.currentTime / video.duration)) : 0);
   }
 
   function startLongPress(target: EventTarget | null) {
-    if (!(target instanceof HTMLElement) || target.closest("button,a") || partsOpen) return false;
+    if (!(target instanceof HTMLElement) || target.closest("button,a")) return false;
     longPressTriggeredRef.current = false;
     if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
     longPressTimerRef.current = window.setTimeout(() => {
@@ -220,32 +169,20 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
     setSpeeding(false);
   }
 
-  function finishPointer(endY: number) {
-    const startY = pointerStartYRef.current;
+  function finishPointer() {
     const wasLongPress = longPressTriggeredRef.current;
     pointerStartYRef.current = undefined;
     stopLongPress();
     if (wasLongPress) {
       longPressTriggeredRef.current = false;
       lastGestureAtRef.current = Date.now();
-      return;
     }
-    if (startY === undefined || Math.abs(startY - endY) < 45) return;
-    lastGestureAtRef.current = Date.now();
-    selectPart(startY > endY ? part + 1 : part - 1);
-  }
-
-  function handleWheel(deltaY: number) {
-    if (Math.abs(deltaY) < 25 || Date.now() - lastGestureAtRef.current < 450) return;
-    lastGestureAtRef.current = Date.now();
-    selectPart(deltaY > 0 ? part + 1 : part - 1);
   }
 
   function seekBy(seconds: number, side: "left" | "right") {
     const video = videoRef.current;
     if (!video || !Number.isFinite(video.duration)) return;
-    const segmentEnd = endSeconds || video.duration;
-    video.currentTime = Math.max(startSeconds, Math.min(segmentEnd, video.currentTime + seconds));
+    video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + seconds));
     setSeekFeedback({ text: seconds > 0 ? "+5 сек" : "−5 сек", side });
     if (seekFeedbackTimerRef.current) window.clearTimeout(seekFeedbackTimerRef.current);
     seekFeedbackTimerRef.current = window.setTimeout(() => setSeekFeedback(undefined), 650);
@@ -285,28 +222,25 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
       }} onPointerMove={(event) => {
         const startY = pointerStartYRef.current;
         if (startY !== undefined && Math.abs(startY - event.clientY) > 12) stopLongPress();
-      }} onPointerUp={(event) => finishPointer(event.clientY)} onPointerCancel={() => { pointerStartYRef.current = undefined; longPressTriggeredRef.current = false; stopLongPress(); }} onWheel={(event) => handleWheel(event.deltaY)}>
+      }} onPointerUp={() => finishPointer()} onPointerCancel={() => { pointerStartYRef.current = undefined; longPressTriggeredRef.current = false; stopLongPress(); }}>
         <section ref={frameRef} className={`vertical-reel-frame ${controlsVisible ? "controls-visible" : "controls-hidden"} ${cleanView ? "clean-view" : ""}`} onClick={(event) => handleFrameTap(event.clientX)} onContextMenu={(event) => event.preventDefault()} onDragStart={(event) => event.preventDefault()}>
-          <video ref={videoRef} src={item.videoUrl} poster={item.posterUrl} autoPlay playsInline muted={muted} preload="auto" onLoadStart={() => setLoading(true)} onWaiting={() => setLoading(true)} onSeeking={() => setLoading(true)} onSeeked={() => { advancingRef.current = false; setLoading(false); }} onLoadedMetadata={(event) => handleMetadata(event.currentTarget)} onCanPlay={(event) => { handleMetadata(event.currentTarget); if (event.currentTarget.paused) void event.currentTarget.play().catch(() => { setLoading(false); setShowPlay(true); }); }} onPlaying={() => { advancingRef.current = false; setLoading(false); setPlaying(true); setShowPlay(false); setVideoError(""); revealControls(); recordView(); }} onPause={() => { setPlaying(false); if (!advancingRef.current) { setShowPlay(true); revealControls(false); } }} onError={() => { setLoading(false); setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); revealControls(false); }} onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget)} onEnded={(event) => handleTimeUpdate(event.currentTarget)}>
+          <video ref={videoRef} src={item.videoUrl} poster={item.posterUrl} autoPlay playsInline muted={muted} preload="auto" onLoadStart={() => setLoading(true)} onWaiting={() => setLoading(true)} onSeeking={() => setLoading(true)} onSeeked={() => setLoading(false)} onCanPlay={(event) => { if (event.currentTarget.paused) void event.currentTarget.play().catch(() => { setLoading(false); setShowPlay(true); }); }} onPlaying={() => { setLoading(false); setPlaying(true); setShowPlay(false); setVideoError(""); revealControls(); recordView(); }} onPause={() => { setPlaying(false); setShowPlay(true); revealControls(false); }} onError={() => { setLoading(false); setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); revealControls(false); }} onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget)} onEnded={() => { setPlaying(false); setShowPlay(true); setProgress(1); revealControls(false); }}>
             {item.subtitles.map((subtitle) => subtitle.sourceUrl && <track default={subtitle === item.subtitles[0]} key={subtitle.id} kind="subtitles" label={subtitle.label} src={subtitle.sourceUrl} srcLang={subtitle.language} />)}
           </video>
           <div className="vertical-reel-shade" />
-          <header className="vertical-reel-top" onClick={(event) => event.stopPropagation()}><button type="button" aria-label="Буцах" onClick={() => router.push("/vertical")}>←</button><Link href="/" aria-label="Нүүр хуудас"><i>Х</i>ҮРЭЭ</Link><span>{part + 1} / {partCount || "…"}</span></header>
+          <header className="vertical-reel-top" onClick={(event) => event.stopPropagation()}><button type="button" aria-label="Буцах" onClick={() => router.push("/vertical")}>←</button><Link href="/" aria-label="Нүүр хуудас"><i>Х</i>ҮРЭЭ</Link><span>БҮТЭН</span></header>
           {loading && !videoError && <div className="vertical-reel-loading" role="status"><i /><span>Видео ачаалж байна…</span></div>}
           {speeding && <div className="vertical-reel-speed" role="status">2×</div>}
           {seekFeedback && <div className={`vertical-reel-seek-feedback ${seekFeedback.side}`} role="status"><b>{seekFeedback.side === "right" ? "»" : "«"}</b><span>{seekFeedback.text}</span></div>}
           {showPlay && !loading && <button className="vertical-reel-center-play" type="button" aria-label="Тоглуулах" onClick={(event) => { event.stopPropagation(); togglePlayback(); }}>▶</button>}
           <div className="vertical-reel-actions" onClick={(event) => event.stopPropagation()}>
             <button type="button" aria-label={muted ? "Дуу асаах" : "Дуу хаах"} onClick={() => setMuted((value) => !value)}><span>{muted ? "⌁" : "◖"}</span><small>{muted ? "Дуу" : "Асаалттай"}</small></button>
-            <button type="button" aria-label="Хэсгүүдийг харах" onClick={() => { setPartsOpen(true); revealControls(false); }}><span>▦</span><small>Ангиуд</small></button>
             <button type="button" aria-label="Цэвэр үзэх горим" onClick={() => setCleanView(true)}><span>⛶</span><small>Бүтэн</small></button>
             <Link href={`/movie/${encodeURIComponent(item.slug)}`}><span>ⓘ</span><small>Тухай</small></Link>
           </div>
-          <div className="vertical-reel-copy"><p>БОСОО ДРАМА · {part + 1}-Р ХЭСЭГ · {item.age}</p><h1>{item.title}</h1><span>{partCount || "…"} хэсэг · хэсэг бүр {item.segmentMinutes} минут</span></div>
-          {part < partCount - 1 && <button className="vertical-reel-next" type="button" onClick={(event) => { event.stopPropagation(); selectPart(part + 1); }}>Дараагийнх <i>⌄</i></button>}
+          <div className="vertical-reel-copy"><p>БОСОО ДРАМА · {item.age}</p><h1>{item.title}</h1><span>Бүтэн видео</span></div>
           {videoError && <button className="vertical-reel-error" type="button" onClick={(event) => { event.stopPropagation(); setVideoError(""); togglePlayback(); }}>{videoError}</button>}
           <div className="vertical-reel-progress"><i style={{ transform: `scaleX(${progress})` }} /></div>
-          {partsOpen && <div className="vertical-reel-parts-backdrop" onClick={(event) => { event.stopPropagation(); setPartsOpen(false); }}><section className="vertical-reel-parts" onClick={(event) => event.stopPropagation()}><header><span><small>БҮХ ХЭСЭГ</small><b>{item.title}</b></span><button type="button" aria-label="Хаах" onClick={() => setPartsOpen(false)}>×</button></header><div>{Array.from({ length: partCount }, (_, index) => <button type="button" className={index === part ? "active" : ""} onClick={() => selectPart(index)} key={index}>{index + 1}</button>)}</div></section></div>}
         </section>
       </article>
     </main>
