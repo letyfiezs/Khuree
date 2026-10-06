@@ -14,16 +14,24 @@ function packageAllows(user: LocalUser, item: ContentItem) {
 }
 
 export async function hasContentAccess(user: LocalUser, item: ContentItem) {
-  if (item.isFree || packageAllows(user, item)) return true;
+  if (user.role === "admin" || item.isFree) return true;
   const db = createSupabaseAdminClient();
+  let rentalRequired = item.rentalPrice !== undefined;
   if (item.kind === "series" && item.seriesId) {
-    const { data: series } = await db.from("series").select("is_free").eq("id", item.seriesId).maybeSingle();
+    const { data: series } = await db.from("series").select("is_free,rental_price").eq("id", item.seriesId).maybeSingle();
     if (series?.is_free) return true;
+    rentalRequired = series?.rental_price != null;
   }
   let query = db.from("content_rentals").select("id").eq("user_id", user.id).gt("expires_at", new Date().toISOString());
   query = item.kind === "series" && item.seriesId ? query.eq("series_id", item.seriesId) : query.eq("movie_id", item.id);
-  const { data } = await query.limit(1);
-  return Boolean(data?.length);
+  const { data, error } = await query.limit(1);
+  if (error) throw error;
+  if (data?.length) return true;
+
+  // A content-specific rental price marks the title as rental-only. Active
+  // package access must not bypass its 72-hour QPay entitlement.
+  if (rentalRequired) return false;
+  return packageAllows(user, item);
 }
 
 export async function requireContentAccess(user: LocalUser, item: ContentItem) {

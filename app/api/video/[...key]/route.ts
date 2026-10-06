@@ -4,6 +4,8 @@ import { r2 } from "@/lib/r2";
 import { createSupabaseAdminClient } from "@/lib/supabase";
 import { cookies } from "next/headers";
 import { verifyVideoAccessToken } from "@/lib/video-access";
+import { hasContentAccess } from "@/lib/content-access";
+import type { ContentItem } from "@/lib/content";
 
 export const runtime = "nodejs";
 
@@ -30,14 +32,22 @@ async function authorize(request: Request, key: string) {
   }
   const { data } = await createSupabaseAdminClient()
     .from("movies")
-    .select("kind,age_rating,genres:movie_genres(genres(name))")
+    .select("id,kind,series_id,is_free,rental_price,age_rating,genres:movie_genres(genres(name))")
     .eq("video_key", key)
     .maybeSingle();
   if (!data) return { error: new Response("Not found", { status: 404 }) };
   const genreRows = data.genres as unknown as { genres: { name: string } | null }[] | null;
-  const vertical = genreRows?.some((row) => row.genres?.name === "Босоо драма") ?? false;
-  const section = data.age_rating === "18+" ? "adult" : vertical ? "vertical" : data.kind === "series" ? "series" : "movie";
-  if (user.role !== "admin" && (!user.canWatch || !user.watchPermissions[section])) return { error: new Response("Forbidden", { status: 403 }) };
+  const genre = genreRows?.map((row) => row.genres?.name).filter((name): name is string => Boolean(name)) ?? [];
+  const accessItem = {
+    id: data.id,
+    kind: data.kind,
+    seriesId: data.series_id ?? undefined,
+    isFree: Boolean(data.is_free),
+    rentalPrice: data.rental_price ?? undefined,
+    age: data.age_rating,
+    genre,
+  } as ContentItem;
+  if (!(await hasContentAccess(user, accessItem))) return { error: new Response("Rental required", { status: 403 }) };
   if (user.role !== "admin") {
     const deviceId = (await cookies()).get("khuree-device-id")?.value;
     if (!deviceId || !user.devices.some((device) => device.id === deviceId)) return { error: new Response("Device not registered", { status: 403 }) };
