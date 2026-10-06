@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/auth/local-auth";
 import {
   completeInvoiceCreation,
   createPayment,
+  createRentalPayment,
   failPayment,
   getPayment,
   paymentPlans,
@@ -9,6 +10,8 @@ import {
 } from "@/lib/payments";
 import { qpayClient, qpaySettings } from "@/lib/qpay";
 import { isQPayError } from "qpay-js";
+import { createSupabaseAdminClient } from "@/lib/supabase";
+import { getPricingSettings, planPrice } from "@/lib/pricing";
 
 export const runtime = "nodejs";
 
@@ -22,19 +25,37 @@ export async function POST(request: Request) {
 
   let orderId: string | null = null;
   try {
-    const body = await request.json().catch(() => ({})) as { plan?: unknown };
+    const body = await request.json().catch(() => ({})) as { plan?: unknown; movieId?: unknown; seriesId?: unknown };
     const plan = body.plan as PlanId;
-    if (!plan || !paymentPlans[plan]) return Response.json({ error: "Багц сонгоно уу." }, { status: 400 });
+    const movieId = typeof body.movieId === "string" ? body.movieId : undefined;
+    const seriesId = typeof body.seriesId === "string" ? body.seriesId : undefined;
+    if ((!movieId && !seriesId) && (!plan || !paymentPlans[plan])) return Response.json({ error: "Багц эсвэл кино сонгоно уу." }, { status: 400 });
     const settings = qpaySettings();
-    const amount = settings.amountFor(plan);
-    if (!Number.isFinite(amount) || amount <= 0) throw new Error("QPay багцын үнэ буруу байна.");
-    orderId = await createPayment(user.id, amount, plan);
+    const pricing = await getPricingSettings();
+    let amount: number;
+    let description: string;
+    if (movieId || seriesId) {
+      const table = movieId ? "movies" : "series";
+      const id = movieId ?? seriesId!;
+      const { data } = await createSupabaseAdminClient().from(table).select("id,title,is_free,rental_price").eq("id", id).maybeSingle();
+      if (!data) return Response.json({ error: "Түрээслэх бүтээл олдсонгүй." }, { status: 404 });
+      if (data.is_free) return Response.json({ error: "Энэ бүтээл үнэгүй байна." }, { status: 400 });
+      amount = data.rental_price ?? pricing.defaultRentalPrice;
+      const rentalPlan: PlanId = seriesId ? "series" : plan && paymentPlans[plan] ? plan : "movie";
+      orderId = await createRentalPayment(user.id, amount, rentalPlan, { movieId, seriesId, title: data.title });
+      description = `Хүрээ — ${data.title} (${pricing.rentalHours} цагийн түрээс)`;
+    } else {
+      amount = planPrice(pricing, plan);
+      orderId = await createPayment(user.id, amount, plan);
+      description = `Хүрээ ${paymentPlans[plan].name} — ${pricing.planDays} хоног`;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error("QPay үнэ буруу байна.");
     const separator = settings.callbackUrl.includes("?") ? "&" : "?";
     const invoice = await qpayClient().createSimpleInvoice({
       invoiceCode: settings.invoiceCode,
       senderInvoiceNo: orderId,
       invoiceReceiverCode: settings.receiverCode,
-      invoiceDescription: `Хүрээ ${paymentPlans[plan].name} — ${settings.days} хоног`,
+      invoiceDescription: description,
       amount,
       callbackUrl: `${settings.callbackUrl}${separator}order_id=${encodeURIComponent(orderId)}`,
     });

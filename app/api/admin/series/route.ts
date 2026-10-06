@@ -14,6 +14,8 @@ export async function POST(request: Request) {
     synopsis?: string;
     categories?: string[];
     ageRating?: string;
+    isFree?: boolean;
+    rentalPrice?: number;
   };
   if (!body.title?.trim() || !body.synopsis?.trim() || !body.categories?.length)
     return Response.json(
@@ -26,6 +28,8 @@ export async function POST(request: Request) {
       synopsis: body.synopsis.trim(),
       categories: body.categories,
       ageRating: body.ageRating ?? "13+",
+      isFree: body.isFree,
+      rentalPrice: body.rentalPrice,
     }),
   });
 }

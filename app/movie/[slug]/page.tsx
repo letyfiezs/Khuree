@@ -5,6 +5,9 @@ import { SiteHeader } from "@/components/site-header";
 import { requireAdultAccess, requireUser } from "@/lib/auth/local-auth";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { isVerticalDrama } from "@/lib/vertical-drama";
+import { hasContentAccess } from "@/lib/content-access";
+import { getPricingSettings } from "@/lib/pricing";
+import { RentalCheckout } from "@/components/rental-checkout";
 export const dynamic = "force-dynamic";
 export async function generateMetadata({
   params,
@@ -39,6 +42,7 @@ export default async function MovieDetail({
   const user = await requireUser(`/movie/${slug}`);
   const item = await getCatalogItem(slug);
   if (!item) notFound();
+  const [hasAccess, pricing] = await Promise.all([hasContentAccess(user, item), getPricingSettings()]);
   if (item.age === "18+") await requireAdultAccess(user, `/movie/${slug}`);
   const seasons: { id: string; title: string }[] = [];
   const episodes: typeof item[] = [];
@@ -88,7 +92,7 @@ export default async function MovieDetail({
             ))}
           </div>
           <div className="hero-actions">
-            <Link
+            {hasAccess ? <Link
               href={
                 item.kind === "series" && firstEpisode
                   ? `/watch/${encodeURIComponent(firstEpisode.slug)}`
@@ -96,8 +100,8 @@ export default async function MovieDetail({
               }
               className="primary-button"
             >
-              ▶ &nbsp;Одоо үзэх
-            </Link>
+              ▶ &nbsp;{item.isFree ? "Үнэгүй үзэх" : "Одоо үзэх"}
+            </Link> : <RentalCheckout movieId={item.id} title={item.title} price={item.rentalPrice ?? pricing.defaultRentalPrice} hours={pricing.rentalHours} />}
             <button className="secondary-button">
               ＋ &nbsp;Миний жагсаалт
             </button>

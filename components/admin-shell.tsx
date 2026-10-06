@@ -62,6 +62,9 @@ export function AdminShell({
             ◉ <span>Хэрэглэгчид</span>
           </Link>
           <AdminChatLink active={active === "chat"} />
+          <Link className={active === "pricing" ? "active" : ""} href="/admin/pricing">
+            ₮ <span>Үнэ ба түрээс</span>
+          </Link>
           <Link href="/movies">
             ◉ <span>Нийтийн каталог</span>
           </Link>

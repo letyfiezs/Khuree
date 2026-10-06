@@ -3,14 +3,16 @@ import { SiteHeader } from "@/components/site-header";
 import { requireUser } from "@/lib/auth/local-auth";
 import { getCatalog } from "@/lib/catalog";
 import { isVerticalDrama } from "@/lib/vertical-drama";
+import { CatalogPagination, pageItems, pageNumber } from "@/components/catalog-pagination";
 
 export const dynamic = "force-dynamic";
 
-export default async function VerticalDramaPage() {
+export default async function VerticalDramaPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   await requireUser("/vertical");
   const items = (await getCatalog("movie")).filter(
     (item) => item.age !== "18+" && isVerticalDrama(item),
   );
+  const page = pageNumber((await searchParams).page);
   return (
     <main>
       <SiteHeader />
@@ -25,7 +27,8 @@ export default async function VerticalDramaPage() {
             <h2>Бүх босоо драма</h2>
             <span>{items.length} бүтээл</span>
           </div>
-          <CatalogGrid items={items} />
+          <CatalogGrid items={pageItems(items, page)} />
+          <CatalogPagination total={items.length} page={page} href="/vertical" />
         </div>
       </section>
     </main>

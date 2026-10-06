@@ -91,6 +91,8 @@ export function AdminMovies({
   const [editAgeRating, setEditAgeRating] = useState("13+");
   const [editAudioLabel, setEditAudioLabel] = useState<AudioLabel>("Субтай");
   const [editSaving, setEditSaving] = useState(false);
+  const [editIsFree, setEditIsFree] = useState(false);
+  const [editRentalPrice, setEditRentalPrice] = useState(5900);
   const [editSeriesTitle, setEditSeriesTitle] = useState("");
   const [editSeasonNumber, setEditSeasonNumber] = useState(1);
   const [editEpisodeNumber, setEditEpisodeNumber] = useState(1);
@@ -542,6 +544,8 @@ export function AdminMovies({
     setEditSeriesTitle(movie.seriesTitle ?? "");
     setEditSeasonNumber(movie.seasonNumber ?? 1);
     setEditEpisodeNumber(movie.episodeNumber ?? 1);
+    setEditIsFree(Boolean(movie.isFree));
+    setEditRentalPrice(movie.rentalPrice ?? 5900);
     setError("");
   }
   async function saveMovie(event: React.FormEvent) {
@@ -572,6 +576,8 @@ export function AdminMovies({
             editMovie.kind === "series" ? editSeasonNumber : undefined,
           episodeNumber:
             editMovie.kind === "series" ? editEpisodeNumber : undefined,
+          isFree: editIsFree,
+          rentalPrice: editRentalPrice,
         }),
       });
       const data = (await response.json()) as { error?: string };
@@ -589,6 +595,8 @@ export function AdminMovies({
                 seriesTitle: editSeriesTitle.trim() || undefined,
                 seasonNumber: editSeasonNumber,
                 episodeNumber: editEpisodeNumber,
+                isFree: editIsFree,
+                rentalPrice: editRentalPrice,
               }
             : item,
         ),
@@ -1132,6 +1140,10 @@ export function AdminMovies({
                 {audioLabels.map((label) => <option value={label} key={label}>{label}</option>)}
               </select>
             </label>
+            <div className="pricing-fields">
+              <label className="check-label"><input type="checkbox" checked={editIsFree} onChange={(event) => setEditIsFree(event.target.checked)} /> Үнэгүй үзүүлэх</label>
+              <label>72 цагийн түрээсийн үнэ<input type="number" min="1" step="100" disabled={editIsFree} value={editRentalPrice} onChange={(event) => setEditRentalPrice(Number(event.target.value))} /></label>
+            </div>
             {editMovie.kind === "series" && (
               <div className="upload-options-grid series-fields">
                 <label>

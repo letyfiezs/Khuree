@@ -64,8 +64,9 @@ export async function listAdminUsers(): Promise<AdminUserItem[]> {
     const activePlanExpiries = Object.values(plans).filter((plan) => plan?.enabled !== false && plan?.expiresAt && plan.expiresAt > now).map((plan) => plan!.expiresAt!);
     const accessEnabled = user.app_metadata?.can_watch !== false && (legacyActive || activePlanExpiries.length > 0);
     const permissions = user.app_metadata?.watch_permissions as Partial<AdminUserItem["watchPermissions"]> | undefined;
-    const qpayPayments = Array.isArray(user.app_metadata?.qpay_payments) ? user.app_metadata.qpay_payments as { id?: string; plan?: string; amount?: number; status?: string; paidAt?: string | null; correctedFromPlan?: string }[] : [];
+    const qpayPayments = Array.isArray(user.app_metadata?.qpay_payments) ? user.app_metadata.qpay_payments as { id?: string; plan?: string; amount?: number; status?: string; paidAt?: string | null; correctedFromPlan?: string; purchaseType?: string }[] : [];
     const paidQpayPayments = qpayPayments.filter((payment) => payment.status === "paid");
+    const paidPlanPayments = paidQpayPayments.filter((payment) => payment.purchaseType !== "rental");
     return {
       id: user.id,
       name: profile?.display_name || user.user_metadata?.name || phone || email || "Хэрэглэгч",
@@ -89,9 +90,9 @@ export async function listAdminUsers(): Promise<AdminUserItem[]> {
       devices: Array.isArray(user.app_metadata?.devices) ? user.app_metadata.devices as RegisteredDevice[] : [],
       qpayPaidAmount: paidQpayPayments.reduce((sum, payment) => sum + (Number.isFinite(Number(payment.amount)) ? Number(payment.amount) : 0), 0),
       qpayPaidCount: paidQpayPayments.length,
-      qpayPaidPlans: [...new Set(paidQpayPayments.map((payment) => payment.plan).filter((plan): plan is string => Boolean(plan)))],
+      qpayPaidPlans: [...new Set(paidPlanPayments.map((payment) => payment.plan).filter((plan): plan is string => Boolean(plan)))],
       qpayLastPaidAt: paidQpayPayments.map((payment) => payment.paidAt).filter((value): value is string => Boolean(value)).sort().at(-1),
-      qpayPayments: paidQpayPayments
+      qpayPayments: paidPlanPayments
         .filter((payment): payment is { id: string; plan: "movie" | "series" | "vertical" | "adult" | "vip"; amount?: number; paidAt?: string | null; correctedFromPlan?: string } => typeof payment.id === "string" && ["movie", "series", "vertical", "adult", "vip"].includes(String(payment.plan)))
         .map((payment) => ({ id: payment.id, plan: payment.plan, amount: Number.isFinite(Number(payment.amount)) ? Number(payment.amount) : 0, paidAt: payment.paidAt ?? undefined, correctedFromPlan: payment.correctedFromPlan })),
     };

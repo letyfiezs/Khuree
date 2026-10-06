@@ -1,6 +1,8 @@
 import { getPayment, markPaymentPaid } from "@/lib/payments";
-import { qpayClient, qpaySettings } from "@/lib/qpay";
+import { qpayClient } from "@/lib/qpay";
 import { setUserPlanEntitlement } from "@/lib/user-entitlements";
+import { activateRental } from "@/lib/content-access";
+import { getPricingSettings } from "@/lib/pricing";
 
 export const runtime = "nodejs";
 
@@ -12,7 +14,9 @@ async function handle(request: Request) {
   if (!payment?.invoiceId)
     return Response.json({ error: "Нэхэмжлэх олдсонгүй." }, { status: 404 });
   if (payment.status === "paid") {
-    await setUserPlanEntitlement(payment.userId, payment.plan, { days: qpaySettings().days, source: "qpay", startsAt: payment.paidAt });
+    const pricing = await getPricingSettings();
+    if (payment.purchaseType === "rental" && payment.rental) await activateRental(payment.userId, payment.id, payment.amount, payment.rental, pricing.rentalHours, payment.paidAt);
+    else await setUserPlanEntitlement(payment.userId, payment.plan, { days: pricing.planDays, source: "qpay", startsAt: payment.paidAt });
     return Response.json({ ok: true });
   }
 
@@ -29,9 +33,10 @@ async function handle(request: Request) {
     );
     if (!paidRows.length || paidAmount < payment.amount)
       return Response.json({ ok: false, status: "pending" }, { status: 202 });
-    const days = qpaySettings().days;
+    const pricing = await getPricingSettings();
     const paid = await markPaymentPaid(orderId, paidRows[0].paymentId);
-    await setUserPlanEntitlement(payment.userId, payment.plan, { days, source: "qpay", startsAt: paid.paidAt });
+    if (paid.purchaseType === "rental" && paid.rental) await activateRental(paid.userId, paid.id, paid.amount, paid.rental, pricing.rentalHours, paid.paidAt);
+    else await setUserPlanEntitlement(paid.userId, paid.plan, { days: pricing.planDays, source: "qpay", startsAt: paid.paidAt });
     return Response.json({ ok: true });
   } catch (error) {
     console.error("QPay callback verification error", error);

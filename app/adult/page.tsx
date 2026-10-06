@@ -4,14 +4,15 @@ import { CatalogGrid } from "@/components/catalog-grid";
 import { SiteHeader } from "@/components/site-header";
 import { requireUser } from "@/lib/auth/local-auth";
 import { getCatalog } from "@/lib/catalog";
+import { CatalogPagination, pageItems, pageNumber } from "@/components/catalog-pagination";
 export const dynamic = "force-dynamic";
 export default async function AdultPage({
   searchParams,
 }: {
-  searchParams: Promise<{ returnTo?: string }>;
+  searchParams: Promise<{ returnTo?: string; page?: string }>;
 }) {
   const user = await requireUser("/adult");
-  const { returnTo } = await searchParams;
+  const { returnTo, page: requestedPage } = await searchParams;
   if (!user.adultEnabled)
     return (
       <main>
@@ -42,6 +43,7 @@ export default async function AdultPage({
       </main>
     );
   const items = (await getCatalog()).filter((item) => item.age === "18+");
+  const page = pageNumber(requestedPage);
   return (
     <main>
       <SiteHeader />
@@ -56,7 +58,8 @@ export default async function AdultPage({
             <h2>18+ бүтээлүүд</h2>
             <span>{items.length} бүтээл</span>
           </div>
-          <CatalogGrid items={items} />
+          <CatalogGrid items={pageItems(items, page)} />
+          <CatalogPagination total={items.length} page={page} href="/adult" />
         </div>
       </section>
     </main>

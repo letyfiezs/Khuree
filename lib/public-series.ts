@@ -27,6 +27,8 @@ function seriesCard(show: Awaited<ReturnType<typeof listSeriesShows>>[number], e
     videoKey: undefined,
     posterUrl: show.posterUrl ?? art.posterUrl,
     backdropUrl: backdrop?.backdropUrl ?? art.backdropUrl,
+    isFree: show.isFree,
+    rentalPrice: show.rentalPrice,
   };
 }
 

@@ -32,6 +32,8 @@ export type ContentItem = {
   episodeNumber?: number;
   audioLabel?: AudioLabel;
   verticalSegmentMinutes?: 3 | 5;
+  isFree?: boolean;
+  rentalPrice?: number;
 };
 export const content: ContentItem[] = [];
 export const getContent = (slug: string) =>

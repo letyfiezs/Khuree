@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { getCatalogItem } from "@/lib/catalog";
 import { PlayerShell } from "@/components/player-shell";
 import { VerticalReels, type VerticalReelItem } from "@/components/vertical-reels";
-import { requireAdultAccess, requireDeviceAccess, requireUser, requireWatchAccess } from "@/lib/auth/local-auth";
+import { requireAdultAccess, requireDeviceAccess, requireUser } from "@/lib/auth/local-auth";
+import { requireContentAccess } from "@/lib/content-access";
 import { listMovies } from "@/lib/movies";
 import { isVerticalDrama } from "@/lib/vertical-drama";
 import { signedR2PlaybackUrl } from "@/lib/r2";
@@ -18,10 +19,7 @@ export default async function Watch({
   await requireDeviceAccess(user, `/watch/${slug}`);
   const item = await getCatalogItem(slug);
   if (!item) notFound();
-  if (item.age === "18+") requireWatchAccess(user, "adult");
-  else if (isVerticalDrama(item)) requireWatchAccess(user, "vertical");
-  else if (item.kind === "series") requireWatchAccess(user, "series");
-  else if (item.kind === "movie") requireWatchAccess(user, "movie");
+  await requireContentAccess(user, item);
   if (item.age === "18+") await requireAdultAccess(user, `/watch/${slug}`);
   if (item.age !== "18+" && isVerticalDrama(item) && item.videoKey) {
     const reel: VerticalReelItem = {

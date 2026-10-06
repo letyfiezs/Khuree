@@ -18,7 +18,7 @@ export function CatalogGrid({ items }: { items: ContentItem[] }) {
               <span className="poster-title">{item.title}</span>
             )}
             <span className="film-tag">
-              {item.kind === "series"
+              {item.isFree ? "ҮНЭГҮЙ" : item.kind === "series"
                 ? "ЦУВРАЛ"
                 : item.videoKey
                   ? "ШИНЭ"
@@ -27,6 +27,7 @@ export function CatalogGrid({ items }: { items: ContentItem[] }) {
             <span className="play-chip">▶</span>
           </div>
           <h3>{item.title}</h3>
+          {!item.isFree && item.rentalPrice && <small className="rental-tag">72 цаг · {item.rentalPrice.toLocaleString("mn-MN")}₮</small>}
           <p>
             {item.kind === "series" ? `${item.episodes ?? 0} анги` : `${item.year} • ${item.duration}`} • {item.genre.slice(0, 2).join(", ")}
           </p>

@@ -26,6 +26,10 @@ export function AdminSeriesHub({
   const [editPoster, setEditPoster] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string>();
+  const [isFree, setIsFree] = useState(false);
+  const [rentalPrice, setRentalPrice] = useState(5900);
+  const [editIsFree, setEditIsFree] = useState(false);
+  const [editRentalPrice, setEditRentalPrice] = useState(5900);
   const visibleShows = useMemo(() => shows.filter((show) => matchesSearch(query, show.title)), [query, shows]);
   async function create(event: React.FormEvent) {
     event.preventDefault();
@@ -37,6 +41,8 @@ export function AdminSeriesHub({
         synopsis,
         categories: selected,
         ageRating: age,
+        isFree,
+        rentalPrice,
       }),
     });
     const data = (await response.json()) as {
@@ -53,12 +59,12 @@ export function AdminSeriesHub({
   }
   function openEditor(show: SeriesShow) {
     setEditing(show); setEditTitle(show.title); setEditSynopsis(show.synopsis);
-    setEditAge(show.ageRating); setEditCategories(show.categories); setEditPoster(null); setError("");
+    setEditAge(show.ageRating); setEditCategories(show.categories); setEditPoster(null); setEditIsFree(show.isFree); setEditRentalPrice(show.rentalPrice ?? 5900); setError("");
   }
   async function saveEdit(event: React.FormEvent) {
     event.preventDefault(); if (!editing) return; setSaving(true); setError("");
     try {
-      const response = await fetch(`/api/admin/series/${editing.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: editTitle, synopsis: editSynopsis, categories: editCategories, ageRating: editAge }) });
+      const response = await fetch(`/api/admin/series/${editing.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: editTitle, synopsis: editSynopsis, categories: editCategories, ageRating: editAge, isFree: editIsFree, rentalPrice: editRentalPrice }) });
       const result = await response.json() as { show?: SeriesShow; error?: string };
       if (!response.ok || !result.show) throw new Error(result.error ?? "Цувралыг засаж чадсангүй.");
       let updated = result.show;
@@ -158,6 +164,7 @@ export function AdminSeriesHub({
                 <option>18+</option>
               </select>
             </label>
+            <div className="pricing-fields"><label className="check-label"><input type="checkbox" checked={isFree} onChange={(event) => setIsFree(event.target.checked)} /> Үнэгүй үзүүлэх</label><label>72 цагийн түрээсийн үнэ<input type="number" min="1" step="100" disabled={isFree} value={rentalPrice} onChange={(event) => setRentalPrice(Number(event.target.value))} /></label></div>
             <fieldset>
               <legend>Ангилал</legend>
               <div className="category-picker">
@@ -199,6 +206,7 @@ export function AdminSeriesHub({
             <label>Цувралын нэр<input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} /></label>
             <label>Тайлбар<textarea value={editSynopsis} onChange={(event) => setEditSynopsis(event.target.value)} /></label>
             <label>Насны ангилал<select value={editAge} onChange={(event) => setEditAge(event.target.value)}><option>Бүх нас</option><option>6+</option><option>13+</option><option>16+</option><option>18+</option></select></label>
+            <div className="pricing-fields"><label className="check-label"><input type="checkbox" checked={editIsFree} onChange={(event) => setEditIsFree(event.target.checked)} /> Үнэгүй үзүүлэх</label><label>72 цагийн түрээсийн үнэ<input type="number" min="1" step="100" disabled={editIsFree} value={editRentalPrice} onChange={(event) => setEditRentalPrice(Number(event.target.value))} /></label></div>
             <fieldset><legend>Ангилал</legend><div className="category-picker">{categories.map((category) => <button type="button" key={category} className={editCategories.includes(category) ? "selected" : ""} onClick={() => setEditCategories((current) => current.includes(category) ? current.filter((item) => item !== category) : [...current, category])}>{editCategories.includes(category) ? "✓ " : "+ "}{category}</button>)}</div></fieldset>
             {error && <p className="form-error">⚠ {error}</p>}
             <div className="modal-actions"><button type="button" onClick={() => setEditing(null)}>Болих</button><button className="primary-button" disabled={saving}>{saving ? "Хадгалж байна…" : "Өөрчлөлт хадгалах"}</button></div>

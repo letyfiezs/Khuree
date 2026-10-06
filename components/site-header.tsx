@@ -63,6 +63,7 @@ export async function SiteHeader() {
           </span>
         </span>
         <a href="/vertical">Босоо драма</a>
+        <a href="/free">Үнэгүй</a>
         <a className="adult-nav" href="/adult">
           18+
         </a>
@@ -79,6 +80,7 @@ export async function SiteHeader() {
           <a href="/movies">Кино</a>
           <a href="/series">Олон ангит</a>
           <a href="/vertical">Босоо драма</a>
+          <a href="/free">Үнэгүй</a>
           <a href="/adult">18+</a>
           <a href="/live">Шууд ТВ</a>
           {user ? (

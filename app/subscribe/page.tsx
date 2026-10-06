@@ -2,14 +2,14 @@ import { QPayCheckout } from "@/components/qpay-checkout";
 import { SiteHeader } from "@/components/site-header";
 import { getCurrentUser } from "@/lib/auth/local-auth";
 import { paymentPlans, type PlanId } from "@/lib/payments";
-import { qpayPlanPrices } from "@/lib/qpay";
+import { getPricingSettings } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 
 export default async function SubscribePage() {
   const user = await getCurrentUser();
-  const configuredDays = Number(process.env.QPAY_PLAN_DAYS ?? 30);
-  const days = Number.isFinite(configuredDays) ? Math.max(1, Math.min(30, Math.trunc(configuredDays))) : 30;
+  const pricing = await getPricingSettings();
+  const days = pricing.planDays;
   return (
     <main>
       <SiteHeader />
@@ -38,7 +38,7 @@ export default async function SubscribePage() {
             </div>
           )}
         </div>
-        <QPayCheckout authenticated={Boolean(user)} days={days} plans={(Object.entries(paymentPlans) as [PlanId, (typeof paymentPlans)[PlanId]][]).map(([id, plan]) => ({ id, ...plan, price: qpayPlanPrices[id] }))} />
+        <QPayCheckout authenticated={Boolean(user)} days={days} plans={(Object.entries(paymentPlans) as [PlanId, (typeof paymentPlans)[PlanId]][]).map(([id, plan]) => ({ id, ...plan, price: pricing[id] }))} />
       </section>
     </main>
   );

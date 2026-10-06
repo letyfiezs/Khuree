@@ -26,6 +26,8 @@ export type PaymentRecord = {
   createdAt: string;
   paidAt: string | null;
   paymentId?: string | null;
+  purchaseType?: "plan" | "rental";
+  rental?: { movieId?: string; seriesId?: string; title: string };
 };
 
 function signingSecret() {
@@ -81,7 +83,17 @@ export async function createPayment(userId: string, amount: number, plan: PlanId
   const value = `${compactUserId(userId)}.${nonce}`;
   const id = `${value}.${signature(value)}`;
   const { payments } = await userPayments(userId);
-  payments.push({ id, userId, plan, invoiceId: null, amount, status: "creating", qrImage: null, shortUrl: null, urls: [], createdAt: new Date().toISOString(), paidAt: null });
+  payments.push({ id, userId, plan, purchaseType: "plan", invoiceId: null, amount, status: "creating", qrImage: null, shortUrl: null, urls: [], createdAt: new Date().toISOString(), paidAt: null });
+  await savePayments(userId, payments);
+  return id;
+}
+
+export async function createRentalPayment(userId: string, amount: number, plan: PlanId, rental: NonNullable<PaymentRecord["rental"]>) {
+  const nonce = randomBytes(4).toString("hex");
+  const value = `${compactUserId(userId)}.${nonce}`;
+  const id = `${value}.${signature(value)}`;
+  const { payments } = await userPayments(userId);
+  payments.push({ id, userId, plan, purchaseType: "rental", rental, invoiceId: null, amount, status: "creating", qrImage: null, shortUrl: null, urls: [], createdAt: new Date().toISOString(), paidAt: null });
   await savePayments(userId, payments);
   return id;
 }
