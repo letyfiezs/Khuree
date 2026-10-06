@@ -266,7 +266,7 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
               </video>
               <div className="vertical-reel-shade" />
               <header className="vertical-reel-top" onClick={(event) => event.stopPropagation()}>
-                <button type="button" aria-label="Буцах" onClick={() => router.push("/vertical")}>←</button><b><i>Х</i>ҮРЭЭ</b><span>{item.part + 1} / {item.partCount}</span>
+                <button type="button" aria-label="Буцах" onClick={() => router.push("/vertical")}>←</button><Link href="/" aria-label="Нүүр хуудас"><i>Х</i>ҮРЭЭ</Link><span>{item.part + 1} / {item.partCount}</span>
               </header>
               {loading && index === active && !videoError && <div className="vertical-reel-loading" role="status"><i /><span>Видео ачаалж байна…</span></div>}
               {showPlay && !loading && index === active && <button className="vertical-reel-center-play" type="button" aria-label="Тоглуулах" onClick={(event) => { event.stopPropagation(); togglePlayback(index); }}>▶</button>}

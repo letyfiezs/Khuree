@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCatalog, getCatalogItem } from "@/lib/catalog";
+import { getCatalogItem } from "@/lib/catalog";
 import { PlayerShell } from "@/components/player-shell";
 import { VerticalReels, type VerticalReelItem } from "@/components/vertical-reels";
 import { requireAdultAccess, requireDeviceAccess, requireUser, requireWatchAccess } from "@/lib/auth/local-auth";
@@ -24,22 +24,19 @@ export default async function Watch({
   else if (item.kind === "movie") requireWatchAccess(user, "movie");
   if (item.age === "18+") await requireAdultAccess(user, `/watch/${slug}`);
   if (item.age !== "18+" && isVerticalDrama(item) && item.videoKey) {
-    const verticalItems = (await getCatalog("movie"))
-      .filter((entry) => entry.age !== "18+" && isVerticalDrama(entry) && entry.videoKey);
-    const orderedItems = [item, ...verticalItems.filter((entry) => entry.id !== item.id)];
-    const reels = await Promise.all(orderedItems.map(async (entry): Promise<VerticalReelItem> => ({
-      id: entry.id,
-      slug: entry.slug,
-      title: entry.title,
-      synopsis: entry.synopsis,
-      age: entry.age,
-      duration: entry.duration,
-      segmentMinutes: entry.verticalSegmentMinutes ?? 3,
-      posterUrl: entry.posterUrl,
-      videoUrl: await signedR2PlaybackUrl(entry.videoKey!),
-      subtitles: (entry.subtitles ?? []).map(({ id, label, language, sourceUrl }) => ({ id, label, language, sourceUrl })),
-    })));
-    return <VerticalReels items={reels} />;
+    const reel: VerticalReelItem = {
+      id: item.id,
+      slug: item.slug,
+      title: item.title,
+      synopsis: item.synopsis,
+      age: item.age,
+      duration: item.duration,
+      segmentMinutes: item.verticalSegmentMinutes ?? 3,
+      posterUrl: item.posterUrl,
+      videoUrl: await signedR2PlaybackUrl(item.videoKey),
+      subtitles: (item.subtitles ?? []).map(({ id, label, language, sourceUrl }) => ({ id, label, language, sourceUrl })),
+    };
+    return <VerticalReels items={[reel]} />;
   }
   const seriesEpisodes = item.kind === "series" && item.seriesId
     ? (await listMovies()).filter((episode) => episode.kind === "series" && episode.seriesId === item.seriesId && episode.status === "published").sort((a, b) => (a.seasonNumber ?? 0) - (b.seasonNumber ?? 0) || (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0))
