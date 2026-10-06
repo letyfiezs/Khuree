@@ -10,10 +10,14 @@ import { signedR2PlaybackUrl } from "@/lib/r2";
 export const dynamic = "force-dynamic";
 export default async function Watch({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ part?: string }>;
 }) {
   const { slug } = await params;
+  const requestedPart = Number.parseInt((await searchParams).part ?? "1", 10);
+  const initialPart = Number.isFinite(requestedPart) ? Math.max(1, Math.min(1000, requestedPart)) : 1;
   const user = await requireUser(`/watch/${slug}`);
   await requireDeviceAccess(user, `/watch/${slug}`);
   const item = await getCatalogItem(slug);
@@ -36,7 +40,7 @@ export default async function Watch({
       videoUrl: await signedR2PlaybackUrl(item.videoKey),
       subtitles: (item.subtitles ?? []).map(({ id, label, language, sourceUrl }) => ({ id, label, language, sourceUrl })),
     };
-    return <VerticalReels items={[reel]} />;
+    return <VerticalReels items={[reel]} initialPart={initialPart} />;
   }
   const seriesEpisodes = item.kind === "series" && item.seriesId
     ? (await listMovies()).filter((episode) => episode.kind === "series" && episode.seriesId === item.seriesId && episode.status === "published").sort((a, b) => (a.seasonNumber ?? 0) - (b.seasonNumber ?? 0) || (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0))
