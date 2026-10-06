@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { recentlyWatchedKey, type RecentWatchItem } from "@/components/recently-watched";
 
@@ -19,16 +20,20 @@ export type VerticalReelItem = {
 const LIVE_HEARTBEAT_INTERVAL_MS = 15_000;
 
 export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
+  const router = useRouter();
   const feedRef = useRef<HTMLDivElement>(null);
   const cardsRef = useRef<(HTMLElement | null)[]>([]);
   const videosRef = useRef<(HTMLVideoElement | null)[]>([]);
   const recordedRef = useRef(new Set<string>());
   const liveSessionRef = useRef<string | undefined>(undefined);
+  const controlsTimerRef = useRef<number | undefined>(undefined);
   const [active, setActive] = useState(0);
   const [muted, setMuted] = useState(true);
   const [playingId, setPlayingId] = useState<string>();
   const [progress, setProgress] = useState(0);
   const [showPlay, setShowPlay] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [videoError, setVideoError] = useState("");
 
   useEffect(() => {
     const root = feedRef.current;
@@ -38,7 +43,11 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
         .filter((entry) => entry.isIntersecting)
         .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
       const index = Number((visible?.target as HTMLElement | undefined)?.dataset.index);
-      if (Number.isInteger(index)) setActive(index);
+      if (Number.isInteger(index)) {
+        setActive(index);
+        setControlsVisible(true);
+        setVideoError("");
+      }
     }, { root, threshold: [0.55, 0.75, 0.9] });
     cardsRef.current.forEach((card) => { if (card) observer.observe(card); });
     return () => observer.disconnect();
@@ -48,7 +57,13 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
     videosRef.current.forEach((video, index) => {
       if (!video) return;
       video.muted = muted;
-      if (index === active) void video.play().catch(() => setShowPlay(true));
+      if (index === active) {
+        if (video.readyState === 0) video.load();
+        void video.play().catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          setShowPlay(true);
+        });
+      }
       else video.pause();
     });
   }, [active, muted]);
@@ -80,6 +95,10 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
     return () => window.removeEventListener("keydown", keyboard);
   }, [active, items.length]);
 
+  useEffect(() => () => {
+    if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
+  }, []);
+
   function goTo(index: number) {
     cardsRef.current[index]?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -87,7 +106,21 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
   function togglePlayback(index: number) {
     const video = videosRef.current[index];
     if (!video) return;
-    if (video.paused) void video.play(); else video.pause();
+    if (video.paused) {
+      if (video.readyState === 0) video.load();
+      void video.play().catch(() => { setShowPlay(true); setVideoError("Видео тоглуулж чадсангүй. Дахин дарж үзнэ үү."); });
+    } else video.pause();
+  }
+
+  function revealControls(autoHide = true) {
+    if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
+    setControlsVisible(true);
+    if (autoHide) controlsTimerRef.current = window.setTimeout(() => setControlsVisible(false), 2500);
+  }
+
+  function handleFrameTap(index: number) {
+    if (!controlsVisible) { revealControls(); return; }
+    togglePlayback(index);
   }
 
   function recordView(item: VerticalReelItem) {
@@ -117,16 +150,19 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
       <div className="vertical-reel-feed" ref={feedRef}>
         {items.map((item, index) => (
           <article className="vertical-reel" data-index={index} key={item.id} ref={(node) => { cardsRef.current[index] = node; }}>
-            <div className="vertical-reel-frame" onClick={() => togglePlayback(index)}>
+            <div className={`vertical-reel-frame ${controlsVisible && index === active ? "controls-visible" : "controls-hidden"}`} onClick={() => handleFrameTap(index)}>
               <video
                 ref={(node) => { videosRef.current[index] = node; }}
                 src={item.videoUrl}
                 poster={item.posterUrl}
+                autoPlay={index === 0}
                 playsInline
                 muted={muted}
                 preload={index < 2 ? "metadata" : "none"}
-                onPlay={() => { setPlayingId(item.id); setShowPlay(false); recordView(item); }}
-                onPause={() => { if (index === active) { setPlayingId(undefined); setShowPlay(true); } }}
+                onCanPlay={(event) => { if (index === active && event.currentTarget.paused) void event.currentTarget.play().catch(() => setShowPlay(true)); }}
+                onPlay={() => { setPlayingId(item.id); setShowPlay(false); setVideoError(""); revealControls(); recordView(item); }}
+                onPause={() => { if (index === active) { setPlayingId(undefined); setShowPlay(true); revealControls(false); } }}
+                onError={() => { if (index === active) { setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); revealControls(false); } }}
                 onTimeUpdate={(event) => { if (index === active) { const video = event.currentTarget; setProgress(video.duration ? video.currentTime / video.duration : 0); } }}
                 onEnded={() => index < items.length - 1 ? goTo(index + 1) : void videosRef.current[index]?.play()}
               >
@@ -134,7 +170,7 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
               </video>
               <div className="vertical-reel-shade" />
               <header className="vertical-reel-top" onClick={(event) => event.stopPropagation()}>
-                <Link href="/">←</Link><b><i>Х</i>ҮРЭЭ</b><span>{index + 1} / {items.length}</span>
+                <button type="button" aria-label="Буцах" onClick={() => router.push("/vertical")}>←</button><b><i>Х</i>ҮРЭЭ</b><span>{index + 1} / {items.length}</span>
               </header>
               {showPlay && index === active && <button className="vertical-reel-center-play" type="button" aria-label="Тоглуулах" onClick={(event) => { event.stopPropagation(); togglePlayback(index); }}>▶</button>}
               <div className="vertical-reel-actions" onClick={(event) => event.stopPropagation()}>
@@ -142,12 +178,13 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
                 <button type="button" aria-label="Дэлгэц дүүргэх" onClick={() => void enterFullscreen(index)}><span>⛶</span><small>Дэлгэц</small></button>
                 <Link href={`/movie/${encodeURIComponent(item.slug)}`}><span>ⓘ</span><small>Тухай</small></Link>
               </div>
-              <div className="vertical-reel-copy" onClick={(event) => event.stopPropagation()}>
+              <div className="vertical-reel-copy">
                 <p>БОСОО ДРАМА · {item.age} · {item.duration}</p>
                 <h1>{item.title}</h1>
                 <span>{item.synopsis}</span>
               </div>
               {index < items.length - 1 && <button className="vertical-reel-next" type="button" onClick={(event) => { event.stopPropagation(); goTo(index + 1); }}>Дараагийнх <i>⌄</i></button>}
+              {videoError && index === active && <button className="vertical-reel-error" type="button" onClick={(event) => { event.stopPropagation(); setVideoError(""); togglePlayback(index); }}>{videoError}</button>}
               <div className="vertical-reel-progress"><i style={{ transform: `scaleX(${progress})` }} /></div>
             </div>
           </article>
