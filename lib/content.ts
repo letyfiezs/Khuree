@@ -34,6 +34,8 @@ export type ContentItem = {
   verticalSegmentMinutes?: 3 | 5;
   isFree?: boolean;
   rentalPrice?: number;
+  trailerKey?: string;
+  trailerDurationSeconds?: number;
 };
 export const content: ContentItem[] = [];
 export const getContent = (slug: string) =>

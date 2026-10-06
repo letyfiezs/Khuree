@@ -28,7 +28,7 @@ export async function DELETE(_request:Request,{params}:{params:Promise<{id:strin
   let r2ObjectsDeleted=0;
   try{
     const episodePrefixes=(episodes??[]).flatMap((episode)=>[
-      `movies/${episode.id}/`,`posters/${episode.id}/`,`backdrops/${episode.id}/`,`subtitles/${episode.id}/`,
+      `movies/${episode.id}/`,`trailers/${episode.id}/`,`posters/${episode.id}/`,`backdrops/${episode.id}/`,`subtitles/${episode.id}/`,
     ]);
     r2ObjectsDeleted=await deleteR2Prefixes([`series-posters/${id}/`,`series-backdrops/${id}/`,...episodePrefixes]);
     for(const episode of episodes??[]){

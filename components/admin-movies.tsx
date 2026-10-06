@@ -93,6 +93,9 @@ export function AdminMovies({
   const [editSaving, setEditSaving] = useState(false);
   const [editIsFree, setEditIsFree] = useState(false);
   const [editRentalPrice, setEditRentalPrice] = useState(5900);
+  const [editTrailerFile, setEditTrailerFile] = useState<File | null>(null);
+  const [editTrailerMinutes, setEditTrailerMinutes] = useState(5);
+  const [editTrailerProgress, setEditTrailerProgress] = useState(0);
   const [editSeriesTitle, setEditSeriesTitle] = useState("");
   const [editSeasonNumber, setEditSeasonNumber] = useState(1);
   const [editEpisodeNumber, setEditEpisodeNumber] = useState(1);
@@ -546,7 +549,44 @@ export function AdminMovies({
     setEditEpisodeNumber(movie.episodeNumber ?? 1);
     setEditIsFree(Boolean(movie.isFree));
     setEditRentalPrice(movie.rentalPrice ?? 5900);
+    setEditTrailerFile(null);
+    setEditTrailerMinutes(Math.max(5, Math.min(10, Math.round((movie.trailerDurationSeconds ?? 300) / 60))));
+    setEditTrailerProgress(0);
     setError("");
+  }
+  async function uploadTrailer(movieId: string, file: File, durationMinutes: number) {
+    const incompatibleCodec = await incompatibleMp4Codec(file);
+    if (incompatibleCodec) throw new Error(`Trailer ${incompatibleCodec} codec-той байна. H.264 + AAC MP4 болгоно уу.`);
+    let key = "", uploadId = "";
+    try {
+      const initResponse = await fetch(`/api/admin/movies/${movieId}/trailer`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "init", filename: file.name, fileSize: file.size }) });
+      const init = await initResponse.json() as { key?: string; uploadId?: string; chunkSize?: number; error?: string };
+      if (!initResponse.ok || !init.key || !init.uploadId || !init.chunkSize) throw new Error(init.error ?? "Trailer upload эхлүүлж чадсангүй.");
+      key = init.key; uploadId = init.uploadId;
+      const parts: { partNumber: number; etag: string }[] = [];
+      for (let offset = 0, partNumber = 1; offset < file.size; offset += init.chunkSize, partNumber += 1) {
+        const signedResponse = await fetch(`/api/admin/movies/${movieId}/trailer`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "sign-part", key, uploadId, partNumber }) });
+        const signed = await signedResponse.json() as { uploadUrl?: string; error?: string };
+        if (!signedResponse.ok || !signed.uploadUrl) throw new Error(signed.error ?? "Trailer upload URL авч чадсангүй.");
+        const chunk = file.slice(offset, Math.min(offset + init.chunkSize, file.size));
+        const etag = await new Promise<string>((resolve, reject) => {
+          const xhr = new XMLHttpRequest(); xhr.open("PUT", signed.uploadUrl!);
+          xhr.upload.onprogress = (event) => { if (event.lengthComputable) setEditTrailerProgress(Math.round(((offset + event.loaded) / file.size) * 100)); };
+          xhr.onerror = () => reject(new Error("Trailer upload тасарлаа."));
+          xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve(xhr.getResponseHeader("ETag") ?? "") : reject(new Error(`Trailer upload HTTP ${xhr.status}`));
+          xhr.send(chunk);
+        });
+        if (!etag) throw new Error("R2 trailer ETag буцаасангүй.");
+        parts.push({ partNumber, etag });
+      }
+      const completeResponse = await fetch(`/api/admin/movies/${movieId}/trailer`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "complete", key, uploadId, parts, durationMinutes, fileSize: file.size }) });
+      const complete = await completeResponse.json() as { trailerKey?: string; trailerDurationSeconds?: number; error?: string };
+      if (!completeResponse.ok || !complete.trailerKey) throw new Error(complete.error ?? "Trailer хадгалж чадсангүй.");
+      return complete;
+    } catch (cause) {
+      if (key && uploadId) await fetch(`/api/admin/movies/${movieId}/trailer`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "abort", key, uploadId }) }).catch(() => undefined);
+      throw cause;
+    }
   }
   async function saveMovie(event: React.FormEvent) {
     event.preventDefault();
@@ -578,10 +618,12 @@ export function AdminMovies({
             editMovie.kind === "series" ? editEpisodeNumber : undefined,
           isFree: editIsFree,
           rentalPrice: editRentalPrice,
+          trailerDurationSeconds: editTrailerMinutes * 60,
         }),
       });
       const data = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Киног засаж чадсангүй.");
+      const trailer = editTrailerFile ? await uploadTrailer(editMovie.id, editTrailerFile, editTrailerMinutes) : undefined;
       setItems((current) =>
         current.map((item) =>
           item.id === editMovie.id
@@ -597,6 +639,8 @@ export function AdminMovies({
                 episodeNumber: editEpisodeNumber,
                 isFree: editIsFree,
                 rentalPrice: editRentalPrice,
+                trailerKey: trailer?.trailerKey ?? item.trailerKey,
+                trailerDurationSeconds: trailer?.trailerDurationSeconds ?? editTrailerMinutes * 60,
               }
             : item,
         ),
@@ -1144,6 +1188,7 @@ export function AdminMovies({
               <label className="check-label"><input type="checkbox" checked={editIsFree} onChange={(event) => setEditIsFree(event.target.checked)} /> Үнэгүй үзүүлэх</label>
               <label>72 цагийн түрээсийн үнэ<input type="number" min="1" step="100" disabled={editIsFree} value={editRentalPrice} onChange={(event) => setEditRentalPrice(Number(event.target.value))} /></label>
             </div>
+            <fieldset className="trailer-fields"><legend>Trailer</legend><label>Trailer видео (H.264 MP4)<input type="file" accept="video/mp4" onChange={(event) => setEditTrailerFile(event.target.files?.[0] ?? null)} /><small>{editMovie.trailerKey ? "Одоогийн trailer-ийг шинэ файлаар солино." : "Түрээслэхээс өмнө үзэх тусдаа видео."}</small></label><label>Хугацаа (5–10 минут)<input type="number" min="5" max="10" value={editTrailerMinutes} onChange={(event) => setEditTrailerMinutes(Math.max(5, Math.min(10, Number(event.target.value))))} /></label>{editTrailerProgress > 0 && <div className="trailer-progress"><i style={{ width: `${editTrailerProgress}%` }} /><span>{editTrailerProgress}%</span></div>}</fieldset>
             {editMovie.kind === "series" && (
               <div className="upload-options-grid series-fields">
                 <label>

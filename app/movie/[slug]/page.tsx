@@ -8,6 +8,8 @@ import { isVerticalDrama } from "@/lib/vertical-drama";
 import { hasContentAccess } from "@/lib/content-access";
 import { getPricingSettings } from "@/lib/pricing";
 import { RentalCheckout } from "@/components/rental-checkout";
+import { TrailerPlayer } from "@/components/trailer-player";
+import { signedR2PlaybackUrl } from "@/lib/r2";
 export const dynamic = "force-dynamic";
 export async function generateMetadata({
   params,
@@ -43,6 +45,7 @@ export default async function MovieDetail({
   const item = await getCatalogItem(slug);
   if (!item) notFound();
   const [hasAccess, pricing] = await Promise.all([hasContentAccess(user, item), getPricingSettings()]);
+  const trailerUrl = item.trailerKey ? await signedR2PlaybackUrl(item.trailerKey, 60 * 60) : undefined;
   if (item.age === "18+") await requireAdultAccess(user, `/movie/${slug}`);
   const seasons: { id: string; title: string }[] = [];
   const episodes: typeof item[] = [];
@@ -105,6 +108,7 @@ export default async function MovieDetail({
             <button className="secondary-button">
               ＋ &nbsp;Миний жагсаалт
             </button>
+            {trailerUrl && <TrailerPlayer src={trailerUrl} title={item.title} durationSeconds={item.trailerDurationSeconds ?? 300} />}
           </div>
         </div>
       </section>
