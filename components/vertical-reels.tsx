@@ -38,7 +38,9 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
   const liveSessionRef = useRef<string | undefined>(undefined);
   const recordedRef = useRef(false);
   const advancingRef = useRef(false);
-  const touchStartYRef = useRef<number | undefined>(undefined);
+  const pointerStartYRef = useRef<number | undefined>(undefined);
+  const longPressTimerRef = useRef<number | undefined>(undefined);
+  const longPressTriggeredRef = useRef(false);
   const lastGestureAtRef = useRef(0);
   const [part, setPart] = useState(Math.max(0, Math.floor(initialPart) - 1));
   const [partCount, setPartCount] = useState(0);
@@ -51,6 +53,8 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
   const [loading, setLoading] = useState(true);
   const [videoError, setVideoError] = useState("");
   const [partsOpen, setPartsOpen] = useState(false);
+  const [cleanView, setCleanView] = useState(false);
+  const [speeding, setSpeeding] = useState(false);
   const segmentSeconds = item.segmentMinutes * 60;
   const startSeconds = part * segmentSeconds;
   const endSeconds = duration ? Math.min(duration, (part + 1) * segmentSeconds) : 0;
@@ -113,7 +117,8 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
   }, [part, partCount]);
 
   useLayoutEffect(() => {
-    const stopPlayback = () => videoRef.current?.pause();
+    const video = videoRef.current;
+    const stopPlayback = () => video?.pause();
     const stopWhenHidden = () => { if (document.visibilityState === "hidden") stopPlayback(); };
     window.addEventListener("pagehide", stopPlayback);
     document.addEventListener("visibilitychange", stopWhenHidden);
@@ -122,6 +127,8 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
       document.removeEventListener("visibilitychange", stopWhenHidden);
       stopPlayback();
       if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
+      if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+      if (video) video.playbackRate = 1;
     };
   }, []);
 
@@ -185,9 +192,38 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
     }
   }
 
-  function handleSwipe(endY: number) {
-    const startY = touchStartYRef.current;
-    touchStartYRef.current = undefined;
+  function startLongPress(target: EventTarget | null) {
+    if (!(target instanceof HTMLElement) || target.closest("button,a") || partsOpen) return false;
+    longPressTriggeredRef.current = false;
+    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = window.setTimeout(() => {
+      const video = videoRef.current;
+      if (!video) return;
+      video.playbackRate = 2;
+      longPressTriggeredRef.current = true;
+      lastGestureAtRef.current = Date.now();
+      setSpeeding(true);
+    }, 420);
+    return true;
+  }
+
+  function stopLongPress() {
+    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = undefined;
+    if (videoRef.current) videoRef.current.playbackRate = 1;
+    setSpeeding(false);
+  }
+
+  function finishPointer(endY: number) {
+    const startY = pointerStartYRef.current;
+    const wasLongPress = longPressTriggeredRef.current;
+    pointerStartYRef.current = undefined;
+    stopLongPress();
+    if (wasLongPress) {
+      longPressTriggeredRef.current = false;
+      lastGestureAtRef.current = Date.now();
+      return;
+    }
     if (startY === undefined || Math.abs(startY - endY) < 45) return;
     lastGestureAtRef.current = Date.now();
     selectPart(startY > endY ? part + 1 : part - 1);
@@ -199,21 +235,19 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
     selectPart(deltaY > 0 ? part + 1 : part - 1);
   }
 
-  async function enterFullscreen() {
-    const frame = frameRef.current;
-    if (frame?.requestFullscreen) {
-      try { await frame.requestFullscreen(); return; }
-      catch { /* Fall back to the native iPhone video player. */ }
-    }
-    const video = videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
-    video?.webkitEnterFullscreen?.();
-  }
-
   return (
     <main className="vertical-reels-page">
-      <article className="vertical-reel vertical-reel-single" onTouchStart={(event) => { touchStartYRef.current = event.changedTouches[0]?.clientY; }} onTouchEnd={(event) => handleSwipe(event.changedTouches[0]?.clientY ?? 0)} onWheel={(event) => handleWheel(event.deltaY)}>
-        <section ref={frameRef} className={`vertical-reel-frame ${controlsVisible ? "controls-visible" : "controls-hidden"}`} onClick={() => {
+      <article className="vertical-reel vertical-reel-single" onPointerDown={(event) => {
+        if (!event.isPrimary || !startLongPress(event.target)) return;
+        pointerStartYRef.current = event.clientY;
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }} onPointerMove={(event) => {
+        const startY = pointerStartYRef.current;
+        if (startY !== undefined && Math.abs(startY - event.clientY) > 12) stopLongPress();
+      }} onPointerUp={(event) => finishPointer(event.clientY)} onPointerCancel={() => { pointerStartYRef.current = undefined; longPressTriggeredRef.current = false; stopLongPress(); }} onWheel={(event) => handleWheel(event.deltaY)}>
+        <section ref={frameRef} className={`vertical-reel-frame ${controlsVisible ? "controls-visible" : "controls-hidden"} ${cleanView ? "clean-view" : ""}`} onClick={() => {
           if (Date.now() - lastGestureAtRef.current < 300) return;
+          if (cleanView) { setCleanView(false); revealControls(false); return; }
           if (!controlsVisible) { revealControls(); return; }
           togglePlayback();
         }}>
@@ -223,11 +257,12 @@ function VerticalReelPlayer({ item, initialPart }: { item: VerticalReelItem; ini
           <div className="vertical-reel-shade" />
           <header className="vertical-reel-top" onClick={(event) => event.stopPropagation()}><button type="button" aria-label="Буцах" onClick={() => router.push("/vertical")}>←</button><Link href="/" aria-label="Нүүр хуудас"><i>Х</i>ҮРЭЭ</Link><span>{part + 1} / {partCount || "…"}</span></header>
           {loading && !videoError && <div className="vertical-reel-loading" role="status"><i /><span>Видео ачаалж байна…</span></div>}
+          {speeding && <div className="vertical-reel-speed" role="status">2×</div>}
           {showPlay && !loading && <button className="vertical-reel-center-play" type="button" aria-label="Тоглуулах" onClick={(event) => { event.stopPropagation(); togglePlayback(); }}>▶</button>}
           <div className="vertical-reel-actions" onClick={(event) => event.stopPropagation()}>
             <button type="button" aria-label={muted ? "Дуу асаах" : "Дуу хаах"} onClick={() => setMuted((value) => !value)}><span>{muted ? "⌁" : "◖"}</span><small>{muted ? "Дуу" : "Асаалттай"}</small></button>
             <button type="button" aria-label="Хэсгүүдийг харах" onClick={() => { setPartsOpen(true); revealControls(false); }}><span>▦</span><small>Ангиуд</small></button>
-            <button type="button" aria-label="Бүтэн дэлгэцээр үзэх" onClick={() => void enterFullscreen()}><span>⛶</span><small>Бүтэн</small></button>
+            <button type="button" aria-label="Цэвэр үзэх горим" onClick={() => setCleanView(true)}><span>⛶</span><small>Бүтэн</small></button>
             <Link href={`/movie/${encodeURIComponent(item.slug)}`}><span>ⓘ</span><small>Тухай</small></Link>
           </div>
           <div className="vertical-reel-copy"><p>БОСОО ДРАМА · {part + 1}-Р ХЭСЭГ · {item.age}</p><h1>{item.title}</h1><span>{partCount || "…"} хэсэг · хэсэг бүр {item.segmentMinutes} минут</span></div>
