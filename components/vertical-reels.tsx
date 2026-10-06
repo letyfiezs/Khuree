@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { recentlyWatchedKey, type RecentWatchItem } from "@/components/recently-watched";
 
 export type VerticalReelItem = {
@@ -82,9 +82,18 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
     return () => window.removeEventListener("keydown", keyboard);
   }, [active, items.length]);
 
-  useEffect(() => () => {
-    if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
-    if (scrollFrameRef.current) window.cancelAnimationFrame(scrollFrameRef.current);
+  useLayoutEffect(() => {
+    const stopPlayback = () => videosRef.current.forEach((video) => video?.pause());
+    const stopWhenHidden = () => { if (document.visibilityState === "hidden") stopPlayback(); };
+    window.addEventListener("pagehide", stopPlayback);
+    document.addEventListener("visibilitychange", stopWhenHidden);
+    return () => {
+      window.removeEventListener("pagehide", stopPlayback);
+      document.removeEventListener("visibilitychange", stopWhenHidden);
+      stopPlayback();
+      if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
+      if (scrollFrameRef.current) window.cancelAnimationFrame(scrollFrameRef.current);
+    };
   }, []);
 
   function handleScroll() {
@@ -146,7 +155,14 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
 
   async function enterFullscreen(index: number) {
     const card = cardsRef.current[index];
-    if (card?.requestFullscreen) await card.requestFullscreen().catch(() => {});
+    if (card?.requestFullscreen) {
+      try {
+        await card.requestFullscreen();
+        return;
+      } catch { /* Fall back to the native iPhone video player. */ }
+    }
+    const video = videosRef.current[index] as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
+    video?.webkitEnterFullscreen?.();
   }
 
   if (!items.length) return (
@@ -194,7 +210,7 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
               {showPlay && !loading && index === active && <button className="vertical-reel-center-play" type="button" aria-label="Тоглуулах" onClick={(event) => { event.stopPropagation(); togglePlayback(index); }}>▶</button>}
               <div className="vertical-reel-actions" onClick={(event) => event.stopPropagation()}>
                 <button type="button" aria-label={muted ? "Дуу асаах" : "Дуу хаах"} onClick={() => setMuted((value) => !value)}><span>{muted ? "⌁" : "◖"}</span><small>{muted ? "Дуу" : "Асаалттай"}</small></button>
-                <button type="button" aria-label="Дэлгэц дүүргэх" onClick={() => void enterFullscreen(index)}><span>⛶</span><small>Дэлгэц</small></button>
+                <button type="button" aria-label="Бүтэн дэлгэцээр үзэх" onClick={() => void enterFullscreen(index)}><span>⛶</span><small>Бүтэн</small></button>
                 <Link href={`/movie/${encodeURIComponent(item.slug)}`}><span>ⓘ</span><small>Тухай</small></Link>
               </div>
               <div className="vertical-reel-copy">
