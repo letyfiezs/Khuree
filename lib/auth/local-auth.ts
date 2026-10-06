@@ -7,7 +7,7 @@ import { authEmail, normalizeIdentifier, pinPassword } from "@/lib/auth/pin-auth
 export type WatchSection = "movie" | "series" | "vertical" | "adult";
 export type RegisteredDevice = { id: string; name: string; createdAt: string; lastSeenAt: string; fingerprint?: string };
 export type CredentialKind = "pin" | "password" | "oauth";
-export type LocalUser = { id: string; name: string; email: string; phone: string; recoveryEmail?: string; loginKind?: "phone" | "email"; credentialKind: CredentialKind; role: "user" | "admin"; emailVerified: boolean; adultEnabled: boolean; hasParentalPin: boolean; adultUnlocked: boolean; canWatch: boolean; accessExpiresAt?: string; watchPermissions: Record<WatchSection, boolean>; devices: RegisteredDevice[]; deviceLimit: number | null };
+export type LocalUser = { id: string; name: string; email: string; phone: string; recoveryEmail?: string; loginKind?: "phone" | "email"; credentialKind: CredentialKind; role: "user" | "admin"; emailVerified: boolean; adultEnabled: boolean; hasParentalPin: boolean; adultUnlocked: boolean; canWatch: boolean; hasVip: boolean; accessExpiresAt?: string; watchPermissions: Record<WatchSection, boolean>; devices: RegisteredDevice[]; deviceLimit: number | null };
 export const sessionCookieName = "sb-access-token";
 export const adminSessionCookieName = "khuree-admin-session";
 
@@ -38,8 +38,7 @@ export async function getCurrentUser(): Promise<LocalUser | null> {
   const now = new Date().toISOString();
   const planEntitlements = user.app_metadata?.plan_entitlements && typeof user.app_metadata.plan_entitlements === "object" ? user.app_metadata.plan_entitlements as Partial<Record<WatchSection | "vip", { enabled?: boolean; expiresAt?: string }>> : {};
   const planActive = (plan: WatchSection | "vip") => Boolean(planEntitlements[plan]?.enabled !== false && planEntitlements[plan]?.expiresAt && planEntitlements[plan]!.expiresAt! > now);
-  const anyPlanActive = (["movie", "series", "vertical", "adult", "vip"] as const).some(planActive);
-  const defaultCanWatch = user.app_metadata?.can_watch !== false && (entitlementActive || anyPlanActive);
+  const hasVip = user.app_metadata?.can_watch !== false && (entitlementActive || planActive("vip"));
   const permissions = user.app_metadata?.watch_permissions as Partial<Record<WatchSection, boolean>> | undefined;
   const devices = Array.isArray(user.app_metadata?.devices) ? user.app_metadata.devices as RegisteredDevice[] : [];
   const loginKind = user.user_metadata?.login_kind === "phone" || user.user_metadata?.login_kind === "email" ? user.user_metadata.login_kind : undefined;
@@ -57,13 +56,14 @@ export async function getCurrentUser(): Promise<LocalUser | null> {
     adultEnabled: Boolean(profile?.adult_enabled),
     hasParentalPin: Boolean(profile?.parental_pin_hash),
     adultUnlocked: Boolean(profile?.adult_unlocked_until && profile.adult_unlocked_until > new Date().toISOString()),
-    canWatch: defaultCanWatch,
-    accessExpiresAt: entitlement?.expiresAt,
+    canWatch: hasVip,
+    hasVip,
+    accessExpiresAt: [entitlement?.expiresAt, planEntitlements.vip?.expiresAt].filter((value): value is string => Boolean(value)).sort().at(-1),
     watchPermissions: {
-      movie: (permissions?.movie ?? true) && (planActive("vip") || planActive("movie") || entitlementActive),
-      series: (permissions?.series ?? true) && (planActive("vip") || planActive("series") || entitlementActive),
-      vertical: (permissions?.vertical ?? true) && (planActive("vip") || planActive("vertical") || entitlementActive),
-      adult: (permissions?.adult ?? true) && (planActive("vip") || planActive("adult") || entitlementActive),
+      movie: (permissions?.movie ?? true) && hasVip,
+      series: (permissions?.series ?? true) && hasVip,
+      vertical: (permissions?.vertical ?? true) && hasVip,
+      adult: (permissions?.adult ?? true) && hasVip,
     },
     devices,
     deviceLimit: user.app_metadata?.unlimited_devices === true ? null : 3,
@@ -76,7 +76,7 @@ export async function requireUser(returnTo = "/movies") {
 }
 export async function requireAdmin() {
   if (await hasAdminPasswordSession()) {
-    return { id: "admin-password", name: "Хүрээ админ", email: "", phone: "", credentialKind: "password", role: "admin", emailVerified: true, adultEnabled: true, hasParentalPin: false, adultUnlocked: true, canWatch: true, watchPermissions: { movie: true, series: true, vertical: true, adult: true }, devices: [], deviceLimit: null } satisfies LocalUser;
+    return { id: "admin-password", name: "Хүрээ админ", email: "", phone: "", credentialKind: "password", role: "admin", emailVerified: true, adultEnabled: true, hasParentalPin: false, adultUnlocked: true, canWatch: true, hasVip: true, watchPermissions: { movie: true, series: true, vertical: true, adult: true }, devices: [], deviceLimit: null } satisfies LocalUser;
   }
   const user = await getCurrentUser();
   if (!user) redirect("/admin/login");

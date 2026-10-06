@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const plan = body.plan as PlanId;
     const movieId = typeof body.movieId === "string" ? body.movieId : undefined;
     const seriesId = typeof body.seriesId === "string" ? body.seriesId : undefined;
-    if ((!movieId && !seriesId) && (!plan || !paymentPlans[plan])) return Response.json({ error: "Багц эсвэл кино сонгоно уу." }, { status: 400 });
+    if ((!movieId && !seriesId) && plan !== "vip") return Response.json({ error: "Зөвхөн VIP багц авах боломжтой." }, { status: 400 });
     const settings = qpaySettings();
     const pricing = await getPricingSettings();
     let amount: number;
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       if (!data) return Response.json({ error: "Түрээслэх бүтээл олдсонгүй." }, { status: 404 });
       if (data.is_free) return Response.json({ error: "Энэ бүтээл үнэгүй байна." }, { status: 400 });
       amount = data.rental_price ?? pricing.defaultRentalPrice;
-      const rentalPlan: PlanId = seriesId ? "series" : plan && paymentPlans[plan] ? plan : "movie";
+      const rentalPlan: PlanId = seriesId ? "series" : "movie";
       orderId = await createRentalPayment(user.id, amount, rentalPlan, { movieId, seriesId, title: data.title });
       description = `Хүрээ — ${data.title} (${pricing.rentalHours} цагийн түрээс)`;
     } else {

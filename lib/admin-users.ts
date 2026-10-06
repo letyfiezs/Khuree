@@ -61,8 +61,9 @@ export async function listAdminUsers(): Promise<AdminUserItem[]> {
     const legacyActive = entitlement ? entitlement.enabled !== false && (!entitlement.expiresAt || entitlement.expiresAt > now) : false;
     const plans = user.app_metadata?.plan_entitlements && typeof user.app_metadata.plan_entitlements === "object" ? user.app_metadata.plan_entitlements as Partial<Record<"movie" | "series" | "vertical" | "adult" | "vip", { enabled?: boolean; expiresAt?: string }>> : {};
     const planActive = (plan: "movie" | "series" | "vertical" | "adult" | "vip") => Boolean(plans[plan]?.enabled !== false && plans[plan]?.expiresAt && plans[plan]!.expiresAt! > now);
-    const activePlanExpiries = Object.values(plans).filter((plan) => plan?.enabled !== false && plan?.expiresAt && plan.expiresAt > now).map((plan) => plan!.expiresAt!);
-    const accessEnabled = user.app_metadata?.can_watch !== false && (legacyActive || activePlanExpiries.length > 0);
+    const vipExpiry = planActive("vip") ? plans.vip?.expiresAt : undefined;
+    const activePlanExpiries = [vipExpiry].filter((value): value is string => Boolean(value));
+    const accessEnabled = user.app_metadata?.can_watch !== false && (legacyActive || planActive("vip"));
     const permissions = user.app_metadata?.watch_permissions as Partial<AdminUserItem["watchPermissions"]> | undefined;
     const qpayPayments = Array.isArray(user.app_metadata?.qpay_payments) ? user.app_metadata.qpay_payments as { id?: string; plan?: string; amount?: number; status?: string; paidAt?: string | null; correctedFromPlan?: string; purchaseType?: string }[] : [];
     const paidQpayPayments = qpayPayments.filter((payment) => payment.status === "paid");
@@ -76,17 +77,17 @@ export async function listAdminUsers(): Promise<AdminUserItem[]> {
       credentialKind: loginKind === "phone" || loginKind === "email" || user.email?.endsWith("@khuree.local") ? "pin" : user.identities?.some((identity) => identity.provider === "email") ? "password" : "oauth",
       role: profile?.role === "admin" ? "admin" : "user",
       watchPermissions: {
-        movie: (permissions?.movie ?? true) && (planActive("vip") || planActive("movie") || legacyActive),
-        series: (permissions?.series ?? true) && (planActive("vip") || planActive("series") || legacyActive),
-        vertical: (permissions?.vertical ?? true) && (planActive("vip") || planActive("vertical") || legacyActive),
-        adult: (permissions?.adult ?? true) && (planActive("vip") || planActive("adult") || legacyActive),
+        movie: (permissions?.movie ?? true) && accessEnabled,
+        series: (permissions?.series ?? true) && accessEnabled,
+        vertical: (permissions?.vertical ?? true) && accessEnabled,
+        adult: (permissions?.adult ?? true) && accessEnabled,
       },
       createdAt: user.created_at,
       lastSignInAt: user.last_sign_in_at,
       lastSeenAt: typeof user.user_metadata?.presence_last_seen_at === "string" ? user.user_metadata.presence_last_seen_at : undefined,
       accessEnabled,
       accessExpiresAt: [entitlement?.expiresAt, ...activePlanExpiries].filter(Boolean).sort().at(-1),
-      activePlans: (["movie", "series", "vertical", "adult", "vip"] as const).filter(planActive),
+      activePlans: planActive("vip") ? ["vip"] : [],
       devices: Array.isArray(user.app_metadata?.devices) ? user.app_metadata.devices as RegisteredDevice[] : [],
       qpayPaidAmount: paidQpayPayments.reduce((sum, payment) => sum + (Number.isFinite(Number(payment.amount)) ? Number(payment.amount) : 0), 0),
       qpayPaidCount: paidQpayPayments.length,

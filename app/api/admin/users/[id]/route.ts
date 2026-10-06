@@ -36,10 +36,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Эрх шинэчилж чадсангүй." }, { status: 500 }); }
   }
   if (body.action === "correct_qpay_plan") {
-    if (typeof body.paymentId !== "string" || !body.paymentId || !(["movie", "series", "vertical", "adult", "vip"] as string[]).includes(String(body.plan)))
-      return Response.json({ error: "QPay багцын мэдээлэл буруу байна." }, { status: 400 });
+    if (typeof body.paymentId !== "string" || !body.paymentId || body.plan !== "vip")
+      return Response.json({ error: "Зөвхөн VIP багц руу хөрвүүлэх боломжтой." }, { status: 400 });
     try {
-      const correction = await correctUserQPayPlan(id, body.paymentId, body.plan as "movie" | "series" | "vertical" | "adult" | "vip", qpaySettings().days);
+      const correction = await correctUserQPayPlan(id, body.paymentId, "vip", qpaySettings().days);
       return Response.json({ id, correction });
     } catch (error) {
       return Response.json({ error: error instanceof Error ? error.message : "QPay багцыг засаж чадсангүй." }, { status: 500 });

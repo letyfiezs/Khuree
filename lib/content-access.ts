@@ -3,35 +3,19 @@ import { redirect } from "next/navigation";
 import type { ContentItem } from "@/lib/content";
 import type { LocalUser } from "@/lib/auth/local-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase";
-import { isVerticalDrama } from "@/lib/vertical-drama";
-
-function packageAllows(user: LocalUser, item: ContentItem) {
-  if (user.role === "admin") return true;
-  if (item.age === "18+") return user.canWatch && user.watchPermissions.adult;
-  if (isVerticalDrama(item)) return user.canWatch && user.watchPermissions.vertical;
-  if (item.kind === "series") return user.canWatch && user.watchPermissions.series;
-  return user.canWatch && user.watchPermissions.movie;
-}
 
 export async function hasContentAccess(user: LocalUser, item: ContentItem) {
-  if (user.role === "admin" || item.isFree) return true;
+  if (user.role === "admin" || item.isFree || user.hasVip) return true;
   const db = createSupabaseAdminClient();
-  let rentalRequired = item.rentalPrice !== undefined;
   if (item.kind === "series" && item.seriesId) {
-    const { data: series } = await db.from("series").select("is_free,rental_price").eq("id", item.seriesId).maybeSingle();
+    const { data: series } = await db.from("series").select("is_free").eq("id", item.seriesId).maybeSingle();
     if (series?.is_free) return true;
-    rentalRequired = series?.rental_price != null;
   }
   let query = db.from("content_rentals").select("id").eq("user_id", user.id).gt("expires_at", new Date().toISOString());
   query = item.kind === "series" && item.seriesId ? query.eq("series_id", item.seriesId) : query.eq("movie_id", item.id);
   const { data, error } = await query.limit(1);
   if (error) throw error;
-  if (data?.length) return true;
-
-  // A content-specific rental price marks the title as rental-only. Active
-  // package access must not bypass its 72-hour QPay entitlement.
-  if (rentalRequired) return false;
-  return packageAllows(user, item);
+  return Boolean(data?.length);
 }
 
 export async function requireContentAccess(user: LocalUser, item: ContentItem) {

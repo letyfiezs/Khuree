@@ -11,8 +11,7 @@ export async function PATCH(request: Request) {
   };
   try {
     const updates = {
-      movie_price: positive("movie"), series_price: positive("series"), vertical_price: positive("vertical"),
-      adult_price: positive("adult"), vip_price: positive("vip"), plan_days: positive("planDays", 365),
+      vip_price: positive("vip"), plan_days: positive("planDays", 365),
       default_rental_price: positive("defaultRentalPrice"), rental_hours: positive("rentalHours", 720),
       updated_at: new Date().toISOString(),
     };

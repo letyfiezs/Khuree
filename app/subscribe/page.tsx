@@ -1,7 +1,7 @@
 import { QPayCheckout } from "@/components/qpay-checkout";
 import { SiteHeader } from "@/components/site-header";
 import { getCurrentUser } from "@/lib/auth/local-auth";
-import { paymentPlans, type PlanId } from "@/lib/payments";
+import { paymentPlans } from "@/lib/payments";
 import { getPricingSettings } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export default async function SubscribePage() {
             хязгааргүй үз.
           </h1>
           <p>
-            Хүссэн төрлөө тусад нь эсвэл VIP багцаар бүгдийг нээгээрэй.
+            VIP багцаар бүх кино, олон ангит, босоо драма болон +18 контентыг нээгээрэй.
           </p>
           <ul>
             <li>3 төхөөрөмж дээр үзэх</li>
@@ -38,7 +38,7 @@ export default async function SubscribePage() {
             </div>
           )}
         </div>
-        <QPayCheckout authenticated={Boolean(user)} days={days} plans={(Object.entries(paymentPlans) as [PlanId, (typeof paymentPlans)[PlanId]][]).map(([id, plan]) => ({ id, ...plan, price: pricing[id] }))} />
+        <QPayCheckout authenticated={Boolean(user)} days={days} plans={[{ id: "vip", ...paymentPlans.vip, price: pricing.vip }]} />
       </section>
     </main>
   );
