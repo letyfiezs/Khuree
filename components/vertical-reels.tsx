@@ -49,7 +49,6 @@ function VerticalReelPlayer({ item }: { item: VerticalReelItem }) {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [loading, setLoading] = useState(true);
   const [videoError, setVideoError] = useState("");
-  const [cleanView, setCleanView] = useState(false);
   const [speeding, setSpeeding] = useState(false);
   const [seekFeedback, setSeekFeedback] = useState<{ text: string; side: "left" | "right" }>();
   useEffect(() => {
@@ -207,10 +206,25 @@ function VerticalReelPlayer({ item }: { item: VerticalReelItem }) {
     if (tapTimerRef.current) window.clearTimeout(tapTimerRef.current);
     tapTimerRef.current = window.setTimeout(() => {
       lastTapRef.current = undefined;
-      if (cleanView) { setCleanView(false); revealControls(false); return; }
       if (!controlsVisible) { revealControls(); return; }
       togglePlayback();
     }, 260);
+  }
+
+  async function enterFullscreen() {
+    const video = videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
+    if (!video) return;
+    stopLongPress();
+    if (video.webkitEnterFullscreen) {
+      try { video.webkitEnterFullscreen(); return; }
+      catch { /* Use the standard fullscreen API below. */ }
+    }
+    if (video.requestFullscreen) {
+      try { await video.requestFullscreen(); return; }
+      catch { /* Use the player frame as the final fallback. */ }
+    }
+    try { await frameRef.current?.requestFullscreen(); }
+    catch { /* This browser does not provide a fullscreen API. */ }
   }
 
   return (
@@ -223,7 +237,7 @@ function VerticalReelPlayer({ item }: { item: VerticalReelItem }) {
         const startY = pointerStartYRef.current;
         if (startY !== undefined && Math.abs(startY - event.clientY) > 12) stopLongPress();
       }} onPointerUp={() => finishPointer()} onPointerCancel={() => { pointerStartYRef.current = undefined; longPressTriggeredRef.current = false; stopLongPress(); }}>
-        <section ref={frameRef} className={`vertical-reel-frame ${controlsVisible ? "controls-visible" : "controls-hidden"} ${cleanView ? "clean-view" : ""}`} onClick={(event) => handleFrameTap(event.clientX)} onContextMenu={(event) => event.preventDefault()} onDragStart={(event) => event.preventDefault()}>
+        <section ref={frameRef} className={`vertical-reel-frame ${controlsVisible ? "controls-visible" : "controls-hidden"}`} onClick={(event) => handleFrameTap(event.clientX)} onContextMenu={(event) => event.preventDefault()} onDragStart={(event) => event.preventDefault()}>
           <video ref={videoRef} src={item.videoUrl} poster={item.posterUrl} autoPlay playsInline muted={muted} preload="auto" onLoadStart={() => setLoading(true)} onWaiting={() => setLoading(true)} onSeeking={() => setLoading(true)} onSeeked={() => setLoading(false)} onCanPlay={(event) => { if (event.currentTarget.paused) void event.currentTarget.play().catch(() => { setLoading(false); setShowPlay(true); }); }} onPlaying={() => { setLoading(false); setPlaying(true); setShowPlay(false); setVideoError(""); revealControls(); recordView(); }} onPause={() => { setPlaying(false); setShowPlay(true); revealControls(false); }} onError={() => { setLoading(false); setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); revealControls(false); }} onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget)} onEnded={() => { setPlaying(false); setShowPlay(true); setProgress(1); revealControls(false); }}>
             {item.subtitles.map((subtitle) => subtitle.sourceUrl && <track default={subtitle === item.subtitles[0]} key={subtitle.id} kind="subtitles" label={subtitle.label} src={subtitle.sourceUrl} srcLang={subtitle.language} />)}
           </video>
@@ -235,7 +249,7 @@ function VerticalReelPlayer({ item }: { item: VerticalReelItem }) {
           {showPlay && !loading && <button className="vertical-reel-center-play" type="button" aria-label="Тоглуулах" onClick={(event) => { event.stopPropagation(); togglePlayback(); }}>▶</button>}
           <div className="vertical-reel-actions" onClick={(event) => event.stopPropagation()}>
             <button type="button" aria-label={muted ? "Дуу асаах" : "Дуу хаах"} onClick={() => setMuted((value) => !value)}><span>{muted ? "⌁" : "◖"}</span><small>{muted ? "Дуу" : "Асаалттай"}</small></button>
-            <button type="button" aria-label="Цэвэр үзэх горим" onClick={() => setCleanView(true)}><span>⛶</span><small>Бүтэн</small></button>
+            <button type="button" aria-label="Бүтэн дэлгэцээр үзэх" onClick={() => void enterFullscreen()}><span>⛶</span><small>Бүтэн</small></button>
             <Link href={`/movie/${encodeURIComponent(item.slug)}`}><span>ⓘ</span><small>Тухай</small></Link>
           </div>
           <div className="vertical-reel-copy"><p>БОСОО ДРАМА · {item.age}</p><h1>{item.title}</h1><span>Бүтэн видео</span></div>
