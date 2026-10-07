@@ -8,7 +8,6 @@ export async function setUserEntitlement(userId: string, input: { enabled: boole
   const client = createSupabaseAdminClient();
   const { data, error } = await client.auth.admin.getUserById(userId);
   if (error || !data.user) throw error ?? new Error("Хэрэглэгч олдсонгүй.");
-  const current = data.user.app_metadata?.entitlement as { enabled?: boolean; expiresAt?: string } | undefined;
   const plans = data.user.app_metadata?.plan_entitlements && typeof data.user.app_metadata.plan_entitlements === "object"
     ? data.user.app_metadata.plan_entitlements as Partial<Record<PlanId, PlanEntitlement>>
     : {};
@@ -16,11 +15,9 @@ export async function setUserEntitlement(userId: string, input: { enabled: boole
   const expiresAt = input.enabled && input.days ? new Date(now.getTime() + input.days * 86400000).toISOString() : undefined;
   const entitlement = { enabled: input.enabled, expiresAt, source: input.source, updatedAt: now.toISOString() };
   const activePlanEntries = Object.entries(plans).filter(([, value]) => value?.enabled !== false && value?.expiresAt && value.expiresAt > now.toISOString());
-  const adjustedPlans = input.enabled && activePlanEntries.length
-    ? Object.fromEntries(Object.entries(plans).map(([key, value]) => activePlanEntries.some(([activeKey]) => activeKey === key) ? [key, { ...value, enabled: true, expiresAt, source: "manual", updatedAt: now.toISOString() }] : [key, value]))
-    : plans;
-  const nextEntitlement = input.enabled && activePlanEntries.length ? current : entitlement;
-  const result = await client.auth.admin.updateUserById(userId, { app_metadata: { ...data.user.app_metadata, can_watch: input.enabled, entitlement: nextEntitlement, plan_entitlements: adjustedPlans } });
+  const result = await client.auth.admin.updateUserById(userId, {
+    app_metadata: { ...data.user.app_metadata, can_watch: input.enabled, entitlement },
+  });
   if (result.error) throw result.error;
   return { enabled: input.enabled, expiresAt, activePlans: activePlanEntries.map(([plan]) => plan) };
 }

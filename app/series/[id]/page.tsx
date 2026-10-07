@@ -30,7 +30,7 @@ export default async function PublicSeriesDetail({ params }: { params: Promise<{
           <h1>{show.title}</h1>
           <p>{show.synopsis}</p>
           <div className="hero-meta"><span>{show.age}</span><span>{episodes.length} анги</span><span className="quality">HD</span></div>
-          {firstEpisode && (hasAccess ? <Link className="primary-button" href={`/watch/${encodeURIComponent(firstEpisode.slug)}`}>▶ &nbsp;{show.isFree ? "Үнэгүй үзэх" : "Эхнээс нь үзэх"}</Link> : <RentalCheckout seriesId={show.id} title={show.title} price={show.rentalPrice ?? pricing.defaultRentalPrice} hours={pricing.rentalHours} />)}
+          {firstEpisode && (hasAccess ? <Link className="primary-button" href={`/watch/${encodeURIComponent(firstEpisode.slug)}`}>▶ &nbsp;{show.isFree ? "Үнэгүй үзэх" : "Эхнээс нь үзэх"}</Link> : <RentalCheckout seriesId={show.id} title={show.title} price={show.rentalPrice ?? pricing.defaultRentalPrice} hours={pricing.rentalHours} vipPrice={pricing.vip} vipDays={pricing.planDays} />)}
         </div>
       </section>
       <section className="series-episodes">

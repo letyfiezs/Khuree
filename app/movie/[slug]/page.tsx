@@ -104,7 +104,7 @@ export default async function MovieDetail({
               className="primary-button"
             >
               ▶ &nbsp;{item.isFree ? "Үнэгүй үзэх" : "Одоо үзэх"}
-            </Link> : <RentalCheckout movieId={item.id} title={item.title} price={item.rentalPrice ?? pricing.defaultRentalPrice} hours={pricing.rentalHours} />}
+            </Link> : <RentalCheckout movieId={item.id} title={item.title} price={item.rentalPrice ?? pricing.defaultRentalPrice} hours={pricing.rentalHours} vipPrice={pricing.vip} vipDays={pricing.planDays} />}
             <button className="secondary-button">
               ＋ &nbsp;Миний жагсаалт
             </button>

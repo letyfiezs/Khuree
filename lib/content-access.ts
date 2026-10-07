@@ -3,6 +3,14 @@ import { redirect } from "next/navigation";
 import type { ContentItem } from "@/lib/content";
 import type { LocalUser } from "@/lib/auth/local-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase";
+import { isVerticalDrama } from "@/lib/vertical-drama";
+
+function legacyPackageAllows(user: LocalUser, item: ContentItem) {
+  if (item.age === "18+") return user.canWatch && user.watchPermissions.adult;
+  if (isVerticalDrama(item)) return user.canWatch && user.watchPermissions.vertical;
+  if (item.kind === "series") return user.canWatch && user.watchPermissions.series;
+  return user.canWatch && user.watchPermissions.movie;
+}
 
 export async function hasContentAccess(user: LocalUser, item: ContentItem) {
   if (user.role === "admin" || item.isFree || user.hasVip) return true;
@@ -15,7 +23,8 @@ export async function hasContentAccess(user: LocalUser, item: ContentItem) {
   query = item.kind === "series" && item.seriesId ? query.eq("series_id", item.seriesId) : query.eq("movie_id", item.id);
   const { data, error } = await query.limit(1);
   if (error) throw error;
-  return Boolean(data?.length);
+  if (data?.length) return true;
+  return legacyPackageAllows(user, item);
 }
 
 export async function requireContentAccess(user: LocalUser, item: ContentItem) {

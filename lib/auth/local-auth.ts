@@ -38,7 +38,10 @@ export async function getCurrentUser(): Promise<LocalUser | null> {
   const now = new Date().toISOString();
   const planEntitlements = user.app_metadata?.plan_entitlements && typeof user.app_metadata.plan_entitlements === "object" ? user.app_metadata.plan_entitlements as Partial<Record<WatchSection | "vip", { enabled?: boolean; expiresAt?: string }>> : {};
   const planActive = (plan: WatchSection | "vip") => Boolean(planEntitlements[plan]?.enabled !== false && planEntitlements[plan]?.expiresAt && planEntitlements[plan]!.expiresAt! > now);
+  const activePlanExpiries = Object.values(planEntitlements).filter((plan) => plan?.enabled !== false && plan?.expiresAt && plan.expiresAt > now).map((plan) => plan!.expiresAt!);
+  const anyPlanActive = activePlanExpiries.length > 0;
   const hasVip = user.app_metadata?.can_watch !== false && (entitlementActive || planActive("vip"));
+  const canWatch = user.app_metadata?.can_watch !== false && (entitlementActive || anyPlanActive);
   const permissions = user.app_metadata?.watch_permissions as Partial<Record<WatchSection, boolean>> | undefined;
   const devices = Array.isArray(user.app_metadata?.devices) ? user.app_metadata.devices as RegisteredDevice[] : [];
   const loginKind = user.user_metadata?.login_kind === "phone" || user.user_metadata?.login_kind === "email" ? user.user_metadata.login_kind : undefined;
@@ -56,14 +59,14 @@ export async function getCurrentUser(): Promise<LocalUser | null> {
     adultEnabled: Boolean(profile?.adult_enabled),
     hasParentalPin: Boolean(profile?.parental_pin_hash),
     adultUnlocked: Boolean(profile?.adult_unlocked_until && profile.adult_unlocked_until > new Date().toISOString()),
-    canWatch: hasVip,
+    canWatch,
     hasVip,
-    accessExpiresAt: [entitlement?.expiresAt, planEntitlements.vip?.expiresAt].filter((value): value is string => Boolean(value)).sort().at(-1),
+    accessExpiresAt: [entitlement?.expiresAt, ...activePlanExpiries].filter((value): value is string => Boolean(value)).sort().at(-1),
     watchPermissions: {
-      movie: (permissions?.movie ?? true) && hasVip,
-      series: (permissions?.series ?? true) && hasVip,
-      vertical: (permissions?.vertical ?? true) && hasVip,
-      adult: (permissions?.adult ?? true) && hasVip,
+      movie: (permissions?.movie ?? true) && (hasVip || planActive("movie")),
+      series: (permissions?.series ?? true) && (hasVip || planActive("series")),
+      vertical: (permissions?.vertical ?? true) && (hasVip || planActive("vertical")),
+      adult: (permissions?.adult ?? true) && (hasVip || planActive("adult")),
     },
     devices,
     deviceLimit: user.app_metadata?.unlimited_devices === true ? null : 3,

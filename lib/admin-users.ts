@@ -16,6 +16,7 @@ export type AdminUserItem = {
   lastSeenAt?: string;
   watching?: { id: string; title: string; kind: "movie" | "series" };
   accessEnabled: boolean;
+  vipEnabled: boolean;
   accessExpiresAt?: string;
   activePlans: string[];
   devices: RegisteredDevice[];
@@ -61,9 +62,9 @@ export async function listAdminUsers(): Promise<AdminUserItem[]> {
     const legacyActive = entitlement ? entitlement.enabled !== false && (!entitlement.expiresAt || entitlement.expiresAt > now) : false;
     const plans = user.app_metadata?.plan_entitlements && typeof user.app_metadata.plan_entitlements === "object" ? user.app_metadata.plan_entitlements as Partial<Record<"movie" | "series" | "vertical" | "adult" | "vip", { enabled?: boolean; expiresAt?: string }>> : {};
     const planActive = (plan: "movie" | "series" | "vertical" | "adult" | "vip") => Boolean(plans[plan]?.enabled !== false && plans[plan]?.expiresAt && plans[plan]!.expiresAt! > now);
-    const vipExpiry = planActive("vip") ? plans.vip?.expiresAt : undefined;
-    const activePlanExpiries = [vipExpiry].filter((value): value is string => Boolean(value));
-    const accessEnabled = user.app_metadata?.can_watch !== false && (legacyActive || planActive("vip"));
+    const activePlanExpiries = Object.values(plans).filter((plan) => plan?.enabled !== false && plan?.expiresAt && plan.expiresAt > now).map((plan) => plan!.expiresAt!);
+    const accessEnabled = user.app_metadata?.can_watch !== false && (legacyActive || activePlanExpiries.length > 0);
+    const vipEnabled = user.app_metadata?.can_watch !== false && (legacyActive || planActive("vip"));
     const permissions = user.app_metadata?.watch_permissions as Partial<AdminUserItem["watchPermissions"]> | undefined;
     const qpayPayments = Array.isArray(user.app_metadata?.qpay_payments) ? user.app_metadata.qpay_payments as { id?: string; plan?: string; amount?: number; status?: string; paidAt?: string | null; correctedFromPlan?: string; purchaseType?: string }[] : [];
     const paidQpayPayments = qpayPayments.filter((payment) => payment.status === "paid");
@@ -86,8 +87,9 @@ export async function listAdminUsers(): Promise<AdminUserItem[]> {
       lastSignInAt: user.last_sign_in_at,
       lastSeenAt: typeof user.user_metadata?.presence_last_seen_at === "string" ? user.user_metadata.presence_last_seen_at : undefined,
       accessEnabled,
+      vipEnabled,
       accessExpiresAt: [entitlement?.expiresAt, ...activePlanExpiries].filter(Boolean).sort().at(-1),
-      activePlans: planActive("vip") ? ["vip"] : [],
+      activePlans: (["movie", "series", "vertical", "adult", "vip"] as const).filter(planActive),
       devices: Array.isArray(user.app_metadata?.devices) ? user.app_metadata.devices as RegisteredDevice[] : [],
       qpayPaidAmount: paidQpayPayments.reduce((sum, payment) => sum + (Number.isFinite(Number(payment.amount)) ? Number(payment.amount) : 0), 0),
       qpayPaidCount: paidQpayPayments.length,
