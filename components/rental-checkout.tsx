@@ -34,7 +34,7 @@ export function RentalCheckout({ movieId, seriesId, title, price, hours, vipPric
     <div className="rental-checkout">
       <div className="rental-offers">
         <div className="rental-offer"><span>{hours} цагийн түрээс</span><strong>{price.toLocaleString("mn-MN")}₮</strong><small>{title}</small></div>
-        <Link className="vip-rental-offer" href="/subscribe"><span>БҮХ КИНО VIP</span><strong>{vipPrice.toLocaleString("mn-MN")}₮</strong><small>{vipDays} хоног · Хязгааргүй үзэх</small></Link>
+        <div className="vip-rental-offer"><span>БҮХ КИНО VIP</span><strong>{vipPrice.toLocaleString("mn-MN")}₮</strong><small>{vipDays} хоног · Хязгааргүй үзэх</small><Link className="vip-rental-button" href="/subscribe">VIP багц авах →</Link></div>
       </div>
       {!payment && <button type="button" className="primary-button" disabled={loading} onClick={() => void createInvoice()}>{loading ? "QR үүсгэж байна…" : "QPay-аар түрээслэх"}</button>}
       {payment?.status === "pending" && <div className="rental-qr">{payment.qrImage && /* QPay returns an inline base64 PNG. */ <img src={payment.qrImage.startsWith("data:") ? payment.qrImage : `data:image/png;base64,${payment.qrImage}`} alt="QPay QR" /> /* eslint-disable-line @next/next/no-img-element */}<button type="button" onClick={() => void checkPayment()}>{loading ? "Шалгаж байна…" : "Төлбөр шалгах"}</button>{payment.shortUrl && <a href={payment.shortUrl}>QPay апп нээх</a>}</div>}
