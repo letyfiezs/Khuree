@@ -12,7 +12,9 @@
     "build:sites": "vinext build",
     "start": "next start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "recorder": "node --env-file=.env.local scripts/live-recorder.mjs"
+    "recorder": "node --env-file=.env.local scripts/live-recorder.mjs",
+    "video:worker": "node --env-file=.env.local scripts/video-hls-worker.mjs",
+    "video:transcode": "node --env-file=.env.local scripts/video-transcode.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1116.0",

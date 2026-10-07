@@ -88,13 +88,14 @@ export async function signedR2DownloadUrl(key: string, downloadName?: string) {
 }
 export async function signedR2PlaybackUrl(key: string, ttlSeconds = 4 * 60 * 60) {
   const { client, bucket } = r2();
-  const type = key.toLowerCase().endsWith(".ts") ? "video/mp2t" : "video/mp4";
+  const type = key.toLowerCase().endsWith(".ts") ? "video/mp2t" : key.toLowerCase().endsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "video/mp4";
+  const cacheControl = key.toLowerCase().endsWith(".ts") ? "public, max-age=31536000, immutable" : "private, max-age=3600";
   return getSignedUrl(client, new GetObjectCommand({
     Bucket: bucket,
     Key: key,
     ResponseContentType: type,
     ResponseContentDisposition: "inline",
-    ResponseCacheControl: "private, max-age=3600",
+    ResponseCacheControl: cacheControl,
   }), { expiresIn: ttlSeconds });
 }
 export async function putR2Object(key: string, body: Buffer, contentType: string) {

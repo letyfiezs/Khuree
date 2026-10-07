@@ -8,6 +8,7 @@ import { requireContentAccess } from "@/lib/content-access";
 import { listMovies } from "@/lib/movies";
 import { isVerticalDrama } from "@/lib/vertical-drama";
 import { signedR2PlaybackUrl } from "@/lib/r2";
+import { createVideoAccessPath } from "@/lib/video-access";
 export const dynamic = "force-dynamic";
 export default async function Watch({
   params,
@@ -29,7 +30,7 @@ export default async function Watch({
       synopsis: item.synopsis,
       age: item.age,
       posterUrl: item.posterUrl,
-      videoUrl: await signedR2PlaybackUrl(item.videoKey),
+      videoUrl: item.hlsKey ? createVideoAccessPath(user.id, item.hlsKey) : await signedR2PlaybackUrl(item.videoKey),
       subtitles: (item.subtitles ?? []).map(({ id, label, language, sourceUrl }) => ({ id, label, language, sourceUrl })),
     };
     return <VerticalReels items={[reel]} />;
@@ -41,7 +42,9 @@ export default async function Watch({
   const nextEpisode = episodeIndex >= 0 ? seriesEpisodes[episodeIndex + 1] : undefined;
   // Entitlement, device and parental checks are complete above. A short-lived
   // R2 URL avoids routing multi-gigabyte video through a Vercel function.
-  const videoUrl = item.videoKey ? await signedR2PlaybackUrl(item.videoKey) : undefined;
+  const videoUrl = item.hlsKey
+    ? createVideoAccessPath(user.id, item.hlsKey)
+    : item.videoKey ? await signedR2PlaybackUrl(item.videoKey) : undefined;
   return (
     <main className="watch-page">
       <div className="watch-top">
