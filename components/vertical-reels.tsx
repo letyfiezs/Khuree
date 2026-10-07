@@ -17,7 +17,6 @@ export type VerticalReelItem = {
 };
 
 const LIVE_HEARTBEAT_INTERVAL_MS = 15_000;
-type ReelShakaInstance = { attach: (video: HTMLVideoElement) => Promise<void>; load: (url: string) => Promise<void>; destroy: () => Promise<void> };
 
 export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
   const item = items[0];
@@ -55,37 +54,16 @@ function VerticalReelPlayer({ item }: { item: VerticalReelItem }) {
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    let player: ReelShakaInstance | undefined;
-    let cancelled = false;
     setLoading(true);
     setShowPlay(false);
     setProgress(0);
     setVideoError("");
-    const play = () => void video.play().catch((error: unknown) => {
+    if (video.readyState === 0) video.load();
+    void video.play().catch((error: unknown) => {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      if (!cancelled) { setLoading(false); setShowPlay(true); }
+      setLoading(false);
+      setShowPlay(true);
     });
-    const boot = async () => {
-      if (!/\.m3u8(?:$|\?)/i.test(item.videoUrl) || video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = item.videoUrl;
-        video.load();
-        play();
-        return;
-      }
-      try {
-        const shaka = await import("shaka-player");
-        shaka.default.polyfill.installAll();
-        const instance = new shaka.default.Player() as unknown as ReelShakaInstance;
-        player = instance;
-        await instance.attach(video);
-        await instance.load(item.videoUrl);
-        if (!cancelled) play();
-      } catch {
-        if (!cancelled) { setLoading(false); setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); }
-      }
-    };
-    void boot();
-    return () => { cancelled = true; void player?.destroy(); };
   }, [item.videoUrl]);
 
   useEffect(() => { if (videoRef.current) videoRef.current.muted = muted; }, [muted]);
@@ -260,7 +238,7 @@ function VerticalReelPlayer({ item }: { item: VerticalReelItem }) {
         if (startY !== undefined && Math.abs(startY - event.clientY) > 12) stopLongPress();
       }} onPointerUp={() => finishPointer()} onPointerCancel={() => { pointerStartYRef.current = undefined; longPressTriggeredRef.current = false; stopLongPress(); }}>
         <section ref={frameRef} className={`vertical-reel-frame ${controlsVisible ? "controls-visible" : "controls-hidden"}`} onClick={(event) => handleFrameTap(event.clientX)} onContextMenu={(event) => event.preventDefault()} onDragStart={(event) => event.preventDefault()}>
-          <video ref={videoRef} poster={item.posterUrl} autoPlay playsInline muted={muted} preload="auto" onLoadStart={() => setLoading(true)} onWaiting={() => setLoading(true)} onSeeking={() => setLoading(true)} onSeeked={() => setLoading(false)} onCanPlay={(event) => { if (event.currentTarget.paused) void event.currentTarget.play().catch(() => { setLoading(false); setShowPlay(true); }); }} onPlaying={() => { setLoading(false); setPlaying(true); setShowPlay(false); setVideoError(""); revealControls(); recordView(); }} onPause={() => { setPlaying(false); setShowPlay(true); revealControls(false); }} onError={() => { setLoading(false); setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); revealControls(false); }} onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget)} onEnded={() => { setPlaying(false); setShowPlay(true); setProgress(1); revealControls(false); }}>
+          <video ref={videoRef} src={item.videoUrl} poster={item.posterUrl} autoPlay playsInline muted={muted} preload="auto" onLoadStart={() => setLoading(true)} onWaiting={() => setLoading(true)} onSeeking={() => setLoading(true)} onSeeked={() => setLoading(false)} onCanPlay={(event) => { if (event.currentTarget.paused) void event.currentTarget.play().catch(() => { setLoading(false); setShowPlay(true); }); }} onPlaying={() => { setLoading(false); setPlaying(true); setShowPlay(false); setVideoError(""); revealControls(); recordView(); }} onPause={() => { setPlaying(false); setShowPlay(true); revealControls(false); }} onError={() => { setLoading(false); setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); revealControls(false); }} onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget)} onEnded={() => { setPlaying(false); setShowPlay(true); setProgress(1); revealControls(false); }}>
             {item.subtitles.map((subtitle) => subtitle.sourceUrl && <track default={subtitle === item.subtitles[0]} key={subtitle.id} kind="subtitles" label={subtitle.label} src={subtitle.sourceUrl} srcLang={subtitle.language} />)}
           </video>
           <div className="vertical-reel-shade" />

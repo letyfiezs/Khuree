@@ -230,10 +230,6 @@ export function PlayerShell({
         loadNative();
         return;
       }
-      if (/\.m3u8(?:$|\?)/i.test(manifestUrl) && videoRef.current.canPlayType("application/vnd.apple.mpegurl")) {
-        loadNative();
-        return;
-      }
       if (/\.ts(?:$|\?)/i.test(manifestUrl)) {
         try {
           const mpegts = (await import("mpegts.js")).default;
@@ -331,9 +327,6 @@ export function PlayerShell({
         instance.addEventListener("error", () =>
           setError("Видео тоглуулахад сүлжээний алдаа гарлаа."),
         );
-        instance.addEventListener("adaptation", () => {
-          if (!cancelled) setQualities(instance.getVariantTracks().filter((track, index, all) => track.height && all.findIndex((item) => item.height === track.height) === index).sort((a, b) => b.height - a.height));
-        });
         await instance.load(manifestUrl);
         if (autoPlay && videoRef.current) {
           videoRef.current.muted = true;

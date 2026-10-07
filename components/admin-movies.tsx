@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { audioLabels, type AudioLabel, type ContentItem } from "@/lib/content";
 import { matchesSearch } from "@/lib/search-normalize";
 import type { SubtitleTrack } from "@/lib/storage/types";
@@ -61,6 +61,7 @@ export function AdminMovies({
   const [selectedCategories, setSelectedCategories] = useState<string[]>(forcedCategory ? [forcedCategory] : []);
   const [ageRating, setAgeRating] = useState(forcedAgeRating ?? "13+");
   const [audioLabel, setAudioLabel] = useState<AudioLabel>("Субтай");
+  const [targetQuality, setTargetQuality] = useState("original");
   const [seriesTitle, setSeriesTitle] = useState(fixedSeries?.title ?? "");
   const [seasonNumber, setSeasonNumber] = useState(
     fixedSeries?.seasonNumber ?? 1,
@@ -74,7 +75,6 @@ export function AdminMovies({
   const visibleItems = useMemo(() => {
     return items.filter((item) => (statusFilter === "all" || item.status === statusFilter) && matchesSearch(query, item.title, item.slug, item.seriesTitle ?? ""));
   }, [items, query, statusFilter]);
-  const processingIds = useMemo(() => items.filter((item) => item.status === "processing").map((item) => item.id).join(","), [items]);
   const [posterMovie, setPosterMovie] = useState<ContentItem | null>(null);
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [posterSaving, setPosterSaving] = useState(false);
@@ -116,6 +116,7 @@ export function AdminMovies({
     setSelectedCategories(forcedCategory ? [forcedCategory] : []);
     setAgeRating(forcedAgeRating ?? "13+");
     setAudioLabel("Субтай");
+    setTargetQuality("original");
     setSeriesTitle(fixedSeries?.title ?? "");
     setSeasonNumber(fixedSeries?.seasonNumber ?? 1);
     setEpisodeNumber(suggestedEpisodeNumber);
@@ -151,6 +152,10 @@ export function AdminMovies({
     setUploadState("uploading");
     setProgress(0);
     try {
+      const incompatibleCodec = await incompatibleMp4Codec(video);
+      if (incompatibleCodec) {
+        throw new Error(`${incompatibleCodec} codec-той MP4 нь бүх утас, browser-т тоглохгүй. Upload хийхээс өмнө H.264 + AAC MP4 (fast start) болгож хөрвүүлнэ үү.`);
+      }
       const initResponse = await fetch("/api/admin/uploads", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -211,6 +216,7 @@ export function AdminMovies({
             bytes: video.size,
             contentType: video.type,
             ageRating,
+            targetQuality,
             kind: mode,
             seriesTitle: mode === "series" ? seriesTitle.trim() : undefined,
             seasonNumber: mode === "series" ? seasonNumber : undefined,
@@ -227,9 +233,8 @@ export function AdminMovies({
       const result = (await completeResponse.json()) as {
         id: string;
         slug: string;
-        status: ContentItem["status"];
+        status: "published";
         videoKey: string;
-        transcodeProgress: number;
       };
       setItems((current) => [
         {
@@ -246,7 +251,6 @@ export function AdminMovies({
           status: result.status,
           accent: "#581018",
           videoKey: result.videoKey,
-          transcodeProgress: result.transcodeProgress,
           subtitles: [],
           audioLabel,
         },
@@ -265,35 +269,6 @@ export function AdminMovies({
           : "Upload хийхэд алдаа гарлаа.",
       );
     }
-  }
-  useEffect(() => {
-    const ids = processingIds.split(",").filter(Boolean);
-    if (!ids.length) return;
-    let cancelled = false;
-    const refresh = async () => {
-      try {
-        const response = await fetch("/api/admin/uploads", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "status", ids }) });
-        if (!response.ok) return;
-        const result = await response.json() as { movies?: { id: string; status: ContentItem["status"]; hls_key?: string | null; hls_bytes?: number; transcode_progress?: number; transcode_error?: string | null }[] };
-        if (cancelled || !result.movies) return;
-        const updates = new Map(result.movies.map((movie) => [movie.id, movie]));
-        setItems((current) => current.map((item) => {
-          const update = updates.get(item.id);
-          return update ? { ...item, status: update.status, hlsKey: update.hls_key ?? undefined, hlsBytes: update.hls_bytes, transcodeProgress: update.transcode_progress ?? 0, transcodeError: update.transcode_error ?? undefined } : item;
-        }));
-      } catch { /* The next poll will retry without interrupting admin work. */ }
-    };
-    void refresh();
-    const timer = window.setInterval(refresh, 5000);
-    return () => { cancelled = true; window.clearInterval(timer); };
-  }, [processingIds]);
-
-  async function retryTranscode(item: ContentItem) {
-    setError("");
-    const response = await fetch("/api/admin/uploads", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "retry", movieId: item.id }) });
-    const result = await response.json() as { error?: string };
-    if (!response.ok) { setError(result.error ?? "Дахин боловсруулж чадсангүй."); return; }
-    setItems((current) => current.map((movie) => movie.id === item.id ? { ...movie, status: "processing", transcodeProgress: 0, transcodeError: undefined } : movie));
   }
   async function openSubtitles(movie: ContentItem) {
     subtitleRequest.current?.abort();
@@ -715,9 +690,9 @@ export function AdminMovies({
         <article><span>НИЙТ КОНТЕНТ</span><b>{items.length}</b><small>Бүх бүртгэл</small></article>
         <article><span>НИЙТЭЛСЭН</span><b>{items.filter((item) => item.status === "published").length}</b><small className="positive">● Хэрэглэгчдэд харагдана</small></article>
         <article><span>БОЛОВСРУУЛЖ БУЙ</span><b>{items.filter((item) => item.status === "processing").length}</b><small>Upload болон хөрвүүлэлт</small></article>
-        <article><span>АЛДААТАЙ</span><b>{items.filter((item) => item.status === "failed").length}</b><small>Дахин боловсруулах боломжтой</small></article>
+        <article><span>НИЙТ SUBTITLE</span><b>{items.reduce((total, item) => total + (item.subtitles?.length ?? 0), 0)}</b><small>Бүх бүтээлд</small></article>
       </div>
-      <div className="content-controls"><label><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Нэр, ангилал, slug-аар хайх" /></label><div>{([['all','Бүгд'],['published','Нийтэлсэн'],['processing','Боловсруулж буй'],['failed','Алдаатай'],['draft','Ноорог']] as const).map(([value,label]) => <button key={value} className={statusFilter === value ? "active" : ""} onClick={() => setStatusFilter(value)}>{label}</button>)}</div><small>{visibleItems.length} үр дүн</small></div>
+      <div className="content-controls"><label><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Нэр, ангилал, slug-аар хайх" /></label><div>{([['all','Бүгд'],['published','Нийтэлсэн'],['processing','Боловсруулж буй'],['draft','Ноорог']] as const).map(([value,label]) => <button key={value} className={statusFilter === value ? "active" : ""} onClick={() => setStatusFilter(value)}>{label}</button>)}</div><small>{visibleItems.length} үр дүн</small></div>
       <div className="admin-table content-admin-table">
         <div className="table-head">
           <span>БҮТЭЭЛ</span>
@@ -734,7 +709,7 @@ export function AdminMovies({
                 <b>{item.title}</b>
                 <small>
                   {item.videoKey
-                    ? `${item.kind === "series" && item.seriesTitle ? `${item.seriesTitle} · S${item.seasonNumber} E${item.episodeNumber} · ` : ""}Видео${forcedCategory === verticalDramaCategory ? " · Бүтнээр тоглоно" : ""} · ${item.status === "processing" ? `HLS ${item.transcodeProgress ?? 0}% · ` : ""}${item.subtitles?.length ?? 0} subtitle`
+                    ? `${item.kind === "series" && item.seriesTitle ? `${item.seriesTitle} · S${item.seasonNumber} E${item.episodeNumber} · ` : ""}Видео${forcedCategory === verticalDramaCategory ? " · Бүтнээр тоглоно" : ""} · ${item.subtitles?.length ?? 0} subtitle`
                     : item.slug}
                 </small>
               </span>
@@ -745,13 +720,10 @@ export function AdminMovies({
                 ? "Нийтэлсэн"
                 : item.status === "processing"
                   ? "Боловсруулж байна"
-                  : item.status === "failed"
-                    ? "Алдаатай"
-                    : "Ноорог"}
+                  : "Ноорог"}
             </span>
             <span>{item.year}</span>
             <div className="row-actions">
-              {item.status === "failed" && <button className="row-action" title={item.transcodeError} onClick={() => void retryTranscode(item)}>Дахин боловсруулах</button>}
               <button
                 className="row-action"
                 onClick={() => {
@@ -888,9 +860,16 @@ export function AdminMovies({
                 </select>
               </label>
               <label>
-                Видео боловсруулалт
-                <strong>Auto HLS · 1080p / 720p / 360p</strong>
-                <small>Эх файлаас боломжтой чанаруудыг автоматаар үүсгэнэ. Upscale хийхгүй.</small>
+                Upload дараах чанар
+                <select
+                  value={targetQuality}
+                  onChange={(event) => setTargetQuality(event.target.value)}
+                >
+                  <option value="original">Эх чанараар хадгалах</option>
+                  <option value="720">720p болгон багасгах</option>
+                  <option value="480">480p болгон багасгах</option>
+                </select>
+                <small>Чанар бууруулах үед MP4/H.264 болгон шахна.</small>
               </label>
             </div>
             <fieldset>
@@ -940,7 +919,9 @@ export function AdminMovies({
                     {uploadState === "uploading"
                       ? `Upload хийж байна — ${progress}%`
                       : uploadState === "processing"
-                        ? "Upload дууслаа. HLS боловсруулалтын дараалалд оруулж байна…"
+                        ? targetQuality === "original"
+                          ? "Бүртгэл үүсгэж байна…"
+                          : `${targetQuality}p болгон шахаж байна… Энэ хэсэг хугацаа авна.`
                         : uploadState === "done"
                           ? "Амжилттай хадгаллаа"
                           : "Upload амжилтгүй"}

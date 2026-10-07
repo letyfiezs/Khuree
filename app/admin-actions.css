@@ -79,7 +79,6 @@
 .content-admin-table .status { width:max-content; padding:5px 8px; border-radius:999px; font-size:7px; font-weight:900; }
 .content-admin-table .status.published { border:1px solid #32c8783a; background:#32c87810; color:#4de092; }
 .content-admin-table .status.processing { border:1px solid #dcae3d3a; background:#dcae3d10; color:#e7c362; }
-.content-admin-table .status.failed { border:1px solid #ff4d5b55; background:#e5091417; color:#ff7d86; }
 .content-admin-table .status.draft { border:1px solid #7773; background:#7771; color:#999; }
 .content-admin-table .row-action { min-height:31px; border-color:#34343a; border-radius:7px; background:#19191c; color:#aaa; font-size:8px; }
 .content-admin-table .row-action:hover { color:#fff; }

@@ -13,15 +13,11 @@ export type ContentItem = {
   rating: number;
   genre: string[];
   kind: ContentKind;
-  status: "published" | "draft" | "processing" | "failed";
+  status: "published" | "draft" | "processing";
   accent: string;
   episodes?: number;
   videoKey?: string;
-  hlsKey?: string;
   videoBytes?: number;
-  hlsBytes?: number;
-  transcodeProgress?: number;
-  transcodeError?: string;
   subtitles?: SubtitleTrack[];
   posterUrl?: string;
   backdropUrl?: string;

@@ -5,7 +5,6 @@ import { ensureCanonicalSeries } from "@/lib/series-admin";
 
 export const runtime = "nodejs";
 const allowed = new Map([["video/mp4", "mp4"], ["application/x-mpegurl", "m3u8"], ["application/vnd.apple.mpegurl", "m3u8"], ["video/mp2t", "ts"], ["video/mpeg", "ts"]]);
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const validKey = (key: string) => /^movies\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(mp4|m3u8|ts)$/i.test(key);
 function videoType(filename: string, suppliedType: string) {
   const extension = filename.toLowerCase().match(/\.(mp4|m3u8|ts)$/)?.[1];
@@ -22,20 +21,6 @@ export async function POST(request: Request) {
   if (!user) return Response.json({ error: "Админ эрх шаардлагатай." }, { status: 403 });
   const body = await request.json() as Record<string, unknown>;
   const db = createSupabaseAdminClient();
-  if (body.action === "status") {
-    const ids = Array.isArray(body.ids) ? body.ids.map(String).filter((id) => uuid.test(id)).slice(0, 100) : [];
-    if (!ids.length) return Response.json({ movies: [] });
-    const { data, error } = await db.from("movies").select("id,status,hls_key,hls_bytes,transcode_progress,transcode_error").in("id", ids);
-    if (error) return Response.json({ error: error.message }, { status: 500 });
-    return Response.json({ movies: data ?? [] });
-  }
-  if (body.action === "retry") {
-    const movieId = String(body.movieId ?? "");
-    if (!uuid.test(movieId)) return Response.json({ error: "Киноны ID буруу." }, { status: 400 });
-    const { data, error } = await db.from("movies").update({ status: "processing", hls_key: null, hls_bytes: 0, transcode_progress: 0, transcode_error: null, transcode_started_at: null, transcode_finished_at: null }).eq("id", movieId).not("video_key", "is", null).select("id,status").maybeSingle();
-    if (error || !data) return Response.json({ error: error?.message ?? "Дахин боловсруулах кино олдсонгүй." }, { status: error ? 500 : 404 });
-    return Response.json(data);
-  }
   if (body.action === "init") {
     const filename = String(body.filename || "");
     const suppliedType = String(body.mimeType || body.contentType || "").toLowerCase();
@@ -86,13 +71,11 @@ export async function POST(request: Request) {
     }
     let slug = slugify(movie.title); const collision = await db.from("movies").select("id").eq("slug", slug).maybeSingle(); if (collision.data) slug += `-${crypto.randomUUID().slice(0, 8)}`;
     const normalizedType = key.toLowerCase().endsWith(".ts") ? "video/mp2t" : key.toLowerCase().endsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "video/mp4";
-    const needsTranscode = normalizedType === "video/mp4";
-    const movieId = key.split("/")[1];
-    const payload = { id: movieId, title: movie.title.trim(), slug, description: movie.synopsis.trim(), video_key: key, original_filename: movie.filename, content_type: normalizedType, bytes: Number(movie.bytes), release_year: Number(movie.releaseYear) || new Date().getFullYear(), duration: movie.verticalSegmentMinutes ? `${movie.verticalSegmentMinutes === 5 ? 5 : 3} минутын хэсэг` : movie.duration || null, rating: Number(movie.rating) || 0, age_rating: movie.ageRating || "13+", featured: Boolean(movie.featured), status: needsTranscode ? "processing" : "published", transcode_progress: 0, kind: movie.kind === "series" ? "series" : "movie", series_id: movie.seriesId || null, season_id: movie.seasonId || null, season_number: movie.seasonNumber || null, episode_number: movie.episodeNumber || null, created_by: user.id === "admin-password" ? null : user.id };
-    let record: { id: string; slug: string; status: string; video_key: string; transcode_progress: number } | null = null;
+    const payload = { title: movie.title.trim(), slug, description: movie.synopsis.trim(), video_key: key, original_filename: movie.filename, content_type: normalizedType, bytes: Number(movie.bytes), release_year: Number(movie.releaseYear) || new Date().getFullYear(), duration: movie.verticalSegmentMinutes ? `${movie.verticalSegmentMinutes === 5 ? 5 : 3} минутын хэсэг` : movie.duration || null, rating: Number(movie.rating) || 0, age_rating: movie.ageRating || "13+", featured: Boolean(movie.featured), status: "published", kind: movie.kind === "series" ? "series" : "movie", series_id: movie.seriesId || null, season_id: movie.seasonId || null, season_number: movie.seasonNumber || null, episode_number: movie.episodeNumber || null, created_by: user.id === "admin-password" ? null : user.id };
+    let record: { id: string; slug: string; status: string; video_key: string } | null = null;
     let insertError: { message: string; code?: string } | null = null;
     for (let attempt = 0; attempt < 3 && !record; attempt += 1) {
-      const result = await db.from("movies").insert(payload).select("id,slug,status,video_key,transcode_progress").single();
+      const result = await db.from("movies").insert(payload).select("id,slug,status,video_key").single();
       record = result.data;
       insertError = result.error;
       if (insertError && attempt < 2) await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
@@ -105,7 +88,7 @@ export async function POST(request: Request) {
     if (genres?.length) await db.from("movie_genres").insert(genres.map((g) => ({ movie_id: record.id, genre_id: g.id })));
     await db.from("orphan_uploads").delete().eq("object_key", key);
     recordCompletedR2Upload(Number(movie.bytes));
-    return Response.json({ id: record.id, slug: record.slug, status: record.status, videoKey: record.video_key, transcodeProgress: record.transcode_progress });
+    return Response.json({ id: record.id, slug: record.slug, status: record.status, videoKey: record.video_key });
   }
   return Response.json({ error: "Тодорхойгүй үйлдэл." }, { status: 400 });
 }
