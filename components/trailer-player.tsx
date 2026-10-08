@@ -16,7 +16,9 @@ function externalEmbedUrl(value?: string) {
       return id && /^[\w-]{6,20}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0` : undefined;
     }
     if (host === "facebook.com" || host.endsWith(".facebook.com") || host === "fb.watch" || host.endsWith(".fb.watch")) {
-      return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url.toString())}&show_text=false&autoplay=true`;
+      const id = url.searchParams.get("v") ?? url.pathname.match(/\/reel\/(\d+)/)?.[1] ?? url.pathname.match(/\/videos\/(?:.*\/)?(\d+)\/?$/)?.[1];
+      const canonicalUrl = id ? `https://www.facebook.com/watch/?v=${id}` : url.toString();
+      return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(canonicalUrl)}&show_text=false&autoplay=true&allowfullscreen=true`;
     }
   } catch { return undefined; }
   return undefined;

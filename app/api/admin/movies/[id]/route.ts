@@ -2,14 +2,30 @@ import { apiAdmin } from "@/lib/admin";
 import { deleteR2Object, deleteR2Prefixes } from "@/lib/r2";
 import { createSupabaseAdminClient } from "@/lib/supabase";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-function normalizeTrailerUrl(value: string) {
+function facebookVideoId(url: URL) {
+  return url.searchParams.get("v")
+    ?? url.pathname.match(/\/reel\/(\d+)/)?.[1]
+    ?? url.pathname.match(/\/videos\/(?:.*\/)?(\d+)\/?$/)?.[1];
+}
+async function normalizeTrailerUrl(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return null;
-  const url = new URL(trimmed);
+  let url = new URL(trimmed);
   if (url.protocol !== "https:") throw new Error("Trailer link HTTPS байх ёстой.");
-  const host = url.hostname.toLowerCase();
+  let host = url.hostname.toLowerCase();
   const allowed = ["youtube.com", "youtu.be", "facebook.com", "fb.watch"].some((domain) => host === domain || host.endsWith(`.${domain}`));
   if (!allowed) throw new Error("Зөвхөн YouTube эсвэл Facebook trailer link зөвшөөрнө.");
+  const isFacebook = host === "facebook.com" || host.endsWith(".facebook.com") || host === "fb.watch" || host.endsWith(".fb.watch");
+  if (isFacebook && !facebookVideoId(url)) {
+    try {
+      const response = await fetch(url, { method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(8_000), headers: { "user-agent": "Mozilla/5.0 KhureeTrailerResolver/1.0" } });
+      url = new URL(response.url);
+      host = url.hostname.toLowerCase();
+      if (!(host === "facebook.com" || host.endsWith(".facebook.com"))) throw new Error("Facebook redirect буруу байна.");
+    } catch { throw new Error("Facebook share link-ийг нээж чадсангүй. Public video link ашиглана уу."); }
+  }
+  const facebookId = isFacebook ? facebookVideoId(url) : undefined;
+  if (isFacebook && facebookId) return `https://www.facebook.com/watch/?v=${facebookId}`;
   return url.toString();
 }
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -20,7 +36,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const db = createSupabaseAdminClient();
   const updates: Record<string, unknown> = { title: body.title.trim(), description: body.synopsis.trim(), age_rating: body.ageRating || "13+", is_free: Boolean(body.isFree), rental_price: body.rentalPrice && body.rentalPrice > 0 ? Math.trunc(body.rentalPrice) : null, updated_at: new Date().toISOString(), season_number: body.seasonNumber || null, episode_number: body.episodeNumber || null };
   if (typeof body.trailerUrl === "string") {
-    try { updates.trailer_url = normalizeTrailerUrl(body.trailerUrl); }
+    try { updates.trailer_url = await normalizeTrailerUrl(body.trailerUrl); }
     catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Trailer link буруу байна." }, { status: 400 }); }
   }
   if (Number.isInteger(body.trailerDurationSeconds) && body.trailerDurationSeconds! >= 300 && body.trailerDurationSeconds! <= 600) updates.trailer_duration_seconds = body.trailerDurationSeconds;
