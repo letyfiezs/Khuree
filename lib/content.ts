@@ -35,6 +35,7 @@ export type ContentItem = {
   isFree?: boolean;
   rentalPrice?: number;
   trailerKey?: string;
+  trailerUrl?: string;
   trailerDurationSeconds?: number;
 };
 export const content: ContentItem[] = [];

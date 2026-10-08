@@ -45,7 +45,7 @@ export default async function MovieDetail({
   const item = await getCatalogItem(slug);
   if (!item) notFound();
   const [hasAccess, pricing] = await Promise.all([hasContentAccess(user, item), getPricingSettings()]);
-  const trailerUrl = item.trailerKey ? await signedR2PlaybackUrl(item.trailerKey, 60 * 60) : undefined;
+  const trailerUrl = !item.trailerUrl && item.trailerKey ? await signedR2PlaybackUrl(item.trailerKey, 60 * 60) : undefined;
   if (item.age === "18+") await requireAdultAccess(user, `/movie/${slug}`);
   const seasons: { id: string; title: string }[] = [];
   const episodes: typeof item[] = [];
@@ -94,7 +94,8 @@ export default async function MovieDetail({
               <span key={genre}>{genre}</span>
             ))}
           </div>
-          <div className="hero-actions">
+          <div className="hero-actions detail-actions">
+            <div className="detail-primary-actions">
             {hasAccess ? <Link
               href={
                 item.kind === "series" && firstEpisode
@@ -108,7 +109,8 @@ export default async function MovieDetail({
             <button className="secondary-button">
               ＋ &nbsp;Миний жагсаалт
             </button>
-            {trailerUrl && <TrailerPlayer src={trailerUrl} title={item.title} durationSeconds={item.trailerDurationSeconds ?? 300} />}
+            </div>
+            {(trailerUrl || item.trailerUrl) && <TrailerPlayer src={trailerUrl} externalUrl={item.trailerUrl} title={item.title} durationSeconds={item.trailerDurationSeconds ?? 300} />}
           </div>
         </div>
       </section>

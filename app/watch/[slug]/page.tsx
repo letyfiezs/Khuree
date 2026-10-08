@@ -22,17 +22,20 @@ export default async function Watch({
   await requireContentAccess(user, item);
   if (item.age === "18+") await requireAdultAccess(user, `/watch/${slug}`);
   if (item.age !== "18+" && isVerticalDrama(item) && item.videoKey) {
-    const reel: VerticalReelItem = {
-      id: item.id,
-      slug: item.slug,
-      title: item.title,
-      synopsis: item.synopsis,
-      age: item.age,
-      posterUrl: item.posterUrl,
-      videoUrl: await signedR2PlaybackUrl(item.videoKey),
-      subtitles: (item.subtitles ?? []).map(({ id, label, language, sourceUrl }) => ({ id, label, language, sourceUrl })),
-    };
-    return <VerticalReels items={[reel]} />;
+    const broadVerticalAccess = user.role === "admin" || user.hasVip || (user.canWatch && user.watchPermissions.vertical);
+    const candidates = (await listMovies()).filter((candidate) => candidate.status === "published" && candidate.age !== "18+" && isVerticalDrama(candidate) && candidate.videoKey && (broadVerticalAccess || candidate.id === item.id || candidate.isFree));
+    const ordered = [item, ...candidates.filter((candidate) => candidate.id !== item.id)].slice(0, 25);
+    const reels: VerticalReelItem[] = await Promise.all(ordered.map(async (candidate) => ({
+      id: candidate.id,
+      slug: candidate.slug,
+      title: candidate.title,
+      synopsis: candidate.synopsis,
+      age: candidate.age,
+      posterUrl: candidate.posterUrl,
+      videoUrl: await signedR2PlaybackUrl(candidate.videoKey!),
+      subtitles: (candidate.subtitles ?? []).map(({ id, label, language, sourceUrl }) => ({ id, label, language, sourceUrl })),
+    })));
+    return <VerticalReels items={reels} />;
   }
   const seriesEpisodes = item.kind === "series" && item.seriesId
     ? (await listMovies()).filter((episode) => episode.kind === "series" && episode.seriesId === item.seriesId && episode.status === "published").sort((a, b) => (a.seasonNumber ?? 0) - (b.seasonNumber ?? 0) || (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0))

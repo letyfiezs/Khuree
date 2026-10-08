@@ -19,16 +19,28 @@ export type VerticalReelItem = {
 const LIVE_HEARTBEAT_INTERVAL_MS = 15_000;
 
 export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
-  const item = items[0];
-  if (!item) return (
+  const feedRef = useRef<HTMLDivElement>(null);
+  const [activeId, setActiveId] = useState(items[0]?.id);
+  useEffect(() => {
+    const feed = feedRef.current;
+    if (!feed) return;
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      const id = visible?.target.getAttribute("data-reel-id");
+      if (id) setActiveId(id);
+    }, { root: feed, threshold: [0.55, 0.75, 0.95] });
+    feed.querySelectorAll<HTMLElement>("[data-reel-id]").forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [items]);
+  if (!items.length) return (
     <main className="vertical-reels-page vertical-reels-empty">
       <Link href="/">← Нүүр</Link><div><b>Босоо драма алга байна</b><span>Admin хэсгээс “Босоо драма” ангилалтай видео нэмнэ үү.</span></div>
     </main>
   );
-  return <VerticalReelPlayer item={item} />;
+  return <main className="vertical-reels-page"><div ref={feedRef} className="vertical-reel-feed">{items.map((item) => <VerticalReelPlayer item={item} active={item.id === activeId} key={item.id} />)}</div></main>;
 }
 
-function VerticalReelPlayer({ item }: { item: VerticalReelItem }) {
+function VerticalReelPlayer({ item, active }: { item: VerticalReelItem; active: boolean }) {
   const router = useRouter();
   const frameRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -54,17 +66,17 @@ function VerticalReelPlayer({ item }: { item: VerticalReelItem }) {
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    setLoading(true);
-    setShowPlay(false);
-    setProgress(0);
-    setVideoError("");
+    if (!active) {
+      video.pause();
+      return;
+    }
     if (video.readyState === 0) video.load();
     void video.play().catch((error: unknown) => {
       if (error instanceof DOMException && error.name === "AbortError") return;
       setLoading(false);
       setShowPlay(true);
     });
-  }, [item.videoUrl]);
+  }, [active, item.videoUrl]);
 
   useEffect(() => { if (videoRef.current) videoRef.current.muted = muted; }, [muted]);
 
@@ -228,8 +240,7 @@ function VerticalReelPlayer({ item }: { item: VerticalReelItem }) {
   }
 
   return (
-    <main className="vertical-reels-page">
-      <article className="vertical-reel vertical-reel-single" onPointerDown={(event) => {
+      <article data-reel-id={item.id} className="vertical-reel" onPointerDown={(event) => {
         if (!event.isPrimary || !startLongPress(event.target)) return;
         pointerStartYRef.current = event.clientY;
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -238,7 +249,7 @@ function VerticalReelPlayer({ item }: { item: VerticalReelItem }) {
         if (startY !== undefined && Math.abs(startY - event.clientY) > 12) stopLongPress();
       }} onPointerUp={() => finishPointer()} onPointerCancel={() => { pointerStartYRef.current = undefined; longPressTriggeredRef.current = false; stopLongPress(); }}>
         <section ref={frameRef} className={`vertical-reel-frame ${controlsVisible ? "controls-visible" : "controls-hidden"}`} onClick={(event) => handleFrameTap(event.clientX)} onContextMenu={(event) => event.preventDefault()} onDragStart={(event) => event.preventDefault()}>
-          <video ref={videoRef} src={item.videoUrl} poster={item.posterUrl} autoPlay playsInline muted={muted} preload="auto" onLoadStart={() => setLoading(true)} onWaiting={() => setLoading(true)} onSeeking={() => setLoading(true)} onSeeked={() => setLoading(false)} onCanPlay={(event) => { if (event.currentTarget.paused) void event.currentTarget.play().catch(() => { setLoading(false); setShowPlay(true); }); }} onPlaying={() => { setLoading(false); setPlaying(true); setShowPlay(false); setVideoError(""); revealControls(); recordView(); }} onPause={() => { setPlaying(false); setShowPlay(true); revealControls(false); }} onError={() => { setLoading(false); setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); revealControls(false); }} onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget)} onEnded={() => { setPlaying(false); setShowPlay(true); setProgress(1); revealControls(false); }}>
+          <video ref={videoRef} src={item.videoUrl} poster={item.posterUrl} autoPlay={active} playsInline muted={muted} preload={active ? "auto" : "metadata"} onLoadStart={() => setLoading(true)} onWaiting={() => setLoading(true)} onSeeking={() => setLoading(true)} onSeeked={() => setLoading(false)} onCanPlay={(event) => { if (active && event.currentTarget.paused) void event.currentTarget.play().catch(() => { setLoading(false); setShowPlay(true); }); }} onPlaying={() => { setLoading(false); setPlaying(true); setShowPlay(false); setVideoError(""); revealControls(); recordView(); }} onPause={() => { setPlaying(false); setShowPlay(true); revealControls(false); }} onError={() => { setLoading(false); setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); revealControls(false); }} onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget)} onEnded={() => { setPlaying(false); setShowPlay(true); setProgress(1); revealControls(false); }}>
             {item.subtitles.map((subtitle) => subtitle.sourceUrl && <track default={subtitle === item.subtitles[0]} key={subtitle.id} kind="subtitles" label={subtitle.label} src={subtitle.sourceUrl} srcLang={subtitle.language} />)}
           </video>
           <div className="vertical-reel-shade" />
@@ -257,6 +268,5 @@ function VerticalReelPlayer({ item }: { item: VerticalReelItem }) {
           <div className="vertical-reel-progress"><i style={{ transform: `scaleX(${progress})` }} /></div>
         </section>
       </article>
-    </main>
   );
 }
