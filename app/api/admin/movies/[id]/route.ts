@@ -7,36 +7,49 @@ function facebookVideoId(url: URL) {
     ?? url.pathname.match(/\/reel\/(\d+)/)?.[1]
     ?? url.pathname.match(/\/videos\/(?:.*\/)?(\d+)\/?$/)?.[1];
 }
-async function normalizeTrailerUrl(value: string) {
+async function normalizeTrailerUrl(value: string, aspectHint: "16:9" | "9:16") {
   const trimmed = value.trim();
-  if (!trimmed) return null;
+  if (!trimmed) return { url: null, aspect: "16:9" as const };
   let url = new URL(trimmed);
   if (url.protocol !== "https:") throw new Error("Trailer link HTTPS байх ёстой.");
-  let host = url.hostname.toLowerCase();
+  const host = url.hostname.toLowerCase();
   const allowed = ["youtube.com", "youtu.be", "facebook.com", "fb.watch"].some((domain) => host === domain || host.endsWith(`.${domain}`));
   if (!allowed) throw new Error("Зөвхөн YouTube эсвэл Facebook trailer link зөвшөөрнө.");
   const isFacebook = host === "facebook.com" || host.endsWith(".facebook.com") || host === "fb.watch" || host.endsWith(".fb.watch");
-  if (isFacebook && !facebookVideoId(url)) {
+  const inputPath = url.pathname.toLowerCase();
+  const inputWasReel = inputPath.includes("/reel/");
+  const inputWasCanonicalWatch = inputPath === "/watch/" && Boolean(url.searchParams.get("v"));
+  if (isFacebook) {
     try {
       const response = await fetch(url, { method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(8_000), headers: { "user-agent": "Mozilla/5.0 KhureeTrailerResolver/1.0" } });
-      url = new URL(response.url);
-      host = url.hostname.toLowerCase();
-      if (!(host === "facebook.com" || host.endsWith(".facebook.com"))) throw new Error("Facebook redirect буруу байна.");
-    } catch { throw new Error("Facebook share link-ийг нээж чадсангүй. Public video link ашиглана уу."); }
+      const resolved = new URL(response.url);
+      const resolvedHost = resolved.hostname.toLowerCase();
+      if (resolvedHost === "facebook.com" || resolvedHost.endsWith(".facebook.com")) url = resolved;
+    } catch { if (!facebookVideoId(url)) throw new Error("Facebook share link-ийг нээж чадсангүй. Public video link ашиглана уу."); }
   }
   const facebookId = isFacebook ? facebookVideoId(url) : undefined;
-  if (isFacebook && facebookId) return `https://www.facebook.com/watch/?v=${facebookId}`;
-  return url.toString();
+  if (isFacebook && facebookId) {
+    const resolvedWasReel = url.pathname.toLowerCase().includes("/reel/");
+    const aspect = inputWasReel || resolvedWasReel ? "9:16" as const : inputWasCanonicalWatch ? aspectHint : "16:9" as const;
+    return { url: `https://www.facebook.com/watch/?v=${facebookId}`, aspect };
+  }
+  const youtubeParts = url.pathname.split("/").filter(Boolean);
+  const aspect = youtubeParts[0] === "shorts" ? "9:16" as const : host === "youtu.be" ? aspectHint : "16:9" as const;
+  return { url: url.toString(), aspect };
 }
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await apiAdmin())) return Response.json({ error: "Админ эрх шаардлагатай." }, { status: 403 });
   const { id } = await params; if (!uuid.test(id)) return Response.json({ error: "ID буруу." }, { status: 400 });
-  const body = await request.json() as { title?: string; synopsis?: string; categories?: unknown[]; ageRating?: string; seasonNumber?: number; episodeNumber?: number; verticalSegmentMinutes?: number; isFree?: boolean; rentalPrice?: number; trailerUrl?: string; trailerDurationSeconds?: number };
+  const body = await request.json() as { title?: string; synopsis?: string; categories?: unknown[]; ageRating?: string; seasonNumber?: number; episodeNumber?: number; verticalSegmentMinutes?: number; isFree?: boolean; rentalPrice?: number; trailerUrl?: string; trailerAspect?: "16:9" | "9:16"; trailerDurationSeconds?: number };
   if (!body.title?.trim() || !body.synopsis?.trim() || !Array.isArray(body.categories) || !body.categories.length) return Response.json({ error: "Мэдээлэл дутуу." }, { status: 400 });
   const db = createSupabaseAdminClient();
   const updates: Record<string, unknown> = { title: body.title.trim(), description: body.synopsis.trim(), age_rating: body.ageRating || "13+", is_free: Boolean(body.isFree), rental_price: body.rentalPrice && body.rentalPrice > 0 ? Math.trunc(body.rentalPrice) : null, updated_at: new Date().toISOString(), season_number: body.seasonNumber || null, episode_number: body.episodeNumber || null };
   if (typeof body.trailerUrl === "string") {
-    try { updates.trailer_url = await normalizeTrailerUrl(body.trailerUrl); }
+    try {
+      const trailer = await normalizeTrailerUrl(body.trailerUrl, body.trailerAspect === "9:16" ? "9:16" : "16:9");
+      updates.trailer_url = trailer.url;
+      updates.trailer_aspect = trailer.aspect;
+    }
     catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Trailer link буруу байна." }, { status: 400 }); }
   }
   if (Number.isInteger(body.trailerDurationSeconds) && body.trailerDurationSeconds! >= 300 && body.trailerDurationSeconds! <= 600) updates.trailer_duration_seconds = body.trailerDurationSeconds;

@@ -110,7 +110,7 @@ export default async function MovieDetail({
               ＋ &nbsp;Миний жагсаалт
             </button>
             </div>
-            {(trailerUrl || item.trailerUrl) && <TrailerPlayer src={trailerUrl} externalUrl={item.trailerUrl} title={item.title} durationSeconds={item.trailerDurationSeconds ?? 300} />}
+            {(trailerUrl || item.trailerUrl) && <TrailerPlayer src={trailerUrl} externalUrl={item.trailerUrl} aspect={item.trailerAspect} title={item.title} durationSeconds={item.trailerDurationSeconds ?? 300} />}
           </div>
         </div>
       </section>

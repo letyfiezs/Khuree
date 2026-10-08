@@ -95,6 +95,7 @@ export function AdminMovies({
   const [editRentalPrice, setEditRentalPrice] = useState(5900);
   const [editTrailerFile, setEditTrailerFile] = useState<File | null>(null);
   const [editTrailerUrl, setEditTrailerUrl] = useState("");
+  const [editTrailerAspect, setEditTrailerAspect] = useState<"16:9" | "9:16">("16:9");
   const [editTrailerMinutes, setEditTrailerMinutes] = useState(5);
   const [editTrailerProgress, setEditTrailerProgress] = useState(0);
   const [editSeriesTitle, setEditSeriesTitle] = useState("");
@@ -552,6 +553,7 @@ export function AdminMovies({
     setEditRentalPrice(movie.rentalPrice ?? 5900);
     setEditTrailerFile(null);
     setEditTrailerUrl(movie.trailerUrl ?? "");
+    setEditTrailerAspect(movie.trailerAspect ?? "16:9");
     setEditTrailerMinutes(Math.max(5, Math.min(10, Math.round((movie.trailerDurationSeconds ?? 300) / 60))));
     setEditTrailerProgress(0);
     setError("");
@@ -621,6 +623,7 @@ export function AdminMovies({
           isFree: editIsFree,
           rentalPrice: editRentalPrice,
           trailerUrl: editTrailerUrl.trim(),
+          trailerAspect: editTrailerAspect,
           trailerDurationSeconds: editTrailerMinutes * 60,
         }),
       });
@@ -644,6 +647,7 @@ export function AdminMovies({
                 rentalPrice: editRentalPrice,
                 trailerKey: trailer?.trailerKey ?? item.trailerKey,
                 trailerUrl: editTrailerUrl.trim() || undefined,
+                trailerAspect: editTrailerAspect,
                 trailerDurationSeconds: trailer?.trailerDurationSeconds ?? editTrailerMinutes * 60,
               }
             : item,
@@ -1192,7 +1196,7 @@ export function AdminMovies({
               <label className="check-label"><input type="checkbox" checked={editIsFree} onChange={(event) => setEditIsFree(event.target.checked)} /> Үнэгүй үзүүлэх</label>
               <label>72 цагийн түрээсийн үнэ<input type="number" min="100" step="100" disabled={editIsFree} value={editRentalPrice} onChange={(event) => setEditRentalPrice(Number(event.target.value))} /></label>
             </div>
-            <fieldset className="trailer-fields"><legend>Trailer</legend><label className="trailer-link-field">YouTube / Facebook trailer link<input type="url" inputMode="url" placeholder="https://www.youtube.com/watch?v=..." value={editTrailerUrl} onChange={(event) => setEditTrailerUrl(event.target.value)} /><small>Public YouTube, Facebook video эсвэл reel link оруулна. Link байвал сайтаас шууд нээгдэнэ.</small></label><label>Эсвэл trailer видео (H.264 MP4)<input type="file" accept="video/mp4" onChange={(event) => setEditTrailerFile(event.target.files?.[0] ?? null)} /><small>{editMovie.trailerKey ? "Одоогийн MP4 trailer-ийг шинэ файлаар солино." : "Link ашиглахгүй үед MP4 upload хийж болно."}</small></label><label>MP4 хугацаа (5–10 минут)<input type="number" min="5" max="10" value={editTrailerMinutes} onChange={(event) => setEditTrailerMinutes(Math.max(5, Math.min(10, Number(event.target.value))))} /></label>{editTrailerProgress > 0 && <div className="trailer-progress"><i style={{ width: `${editTrailerProgress}%` }} /><span>{editTrailerProgress}%</span></div>}</fieldset>
+            <fieldset className="trailer-fields"><legend>Trailer</legend><label className="trailer-link-field">YouTube / Facebook trailer link<input type="url" inputMode="url" placeholder="https://www.youtube.com/watch?v=..." value={editTrailerUrl} onChange={(event) => { const value = event.target.value; setEditTrailerUrl(value); if (/\/(shorts|reel)\//i.test(value)) setEditTrailerAspect("9:16"); else if (/youtube\.com\/watch|facebook\.com\/.*videos\//i.test(value)) setEditTrailerAspect("16:9"); }} /><small>Shorts/Reel холбоосыг 9:16, энгийн видеог 16:9 гэж автоматаар танина.</small></label><label>Видео хэлбэр<select value={editTrailerAspect} onChange={(event) => setEditTrailerAspect(event.target.value as "16:9" | "9:16")}><option value="16:9">Хэвтээ 16:9</option><option value="9:16">Босоо Reel 9:16</option></select><small>Автомат танилт зөрвөл эндээс засна.</small></label><label>Эсвэл trailer видео (H.264 MP4)<input type="file" accept="video/mp4" onChange={(event) => setEditTrailerFile(event.target.files?.[0] ?? null)} /><small>{editMovie.trailerKey ? "Одоогийн MP4 trailer-ийг шинэ файлаар солино." : "Link ашиглахгүй үед MP4 upload хийж болно."}</small></label><label>MP4 хугацаа (5–10 минут)<input type="number" min="5" max="10" value={editTrailerMinutes} onChange={(event) => setEditTrailerMinutes(Math.max(5, Math.min(10, Number(event.target.value))))} /></label>{editTrailerProgress > 0 && <div className="trailer-progress"><i style={{ width: `${editTrailerProgress}%` }} /><span>{editTrailerProgress}%</span></div>}</fieldset>
             {editMovie.kind === "series" && (
               <div className="upload-options-grid series-fields">
                 <label>

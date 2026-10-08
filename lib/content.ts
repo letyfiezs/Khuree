@@ -36,6 +36,7 @@ export type ContentItem = {
   rentalPrice?: number;
   trailerKey?: string;
   trailerUrl?: string;
+  trailerAspect?: "16:9" | "9:16";
   trailerDurationSeconds?: number;
 };
 export const content: ContentItem[] = [];
