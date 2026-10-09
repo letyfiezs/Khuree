@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { closeSync, mkdirSync, openSync } from "node:fs";
 import { apiAdmin } from "@/lib/admin";
 import { createSupabaseAdminClient } from "@/lib/supabase";
 import { secureHlsReady } from "@/lib/secure-video";
@@ -14,7 +15,10 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
   if (error) return Response.json({ error: error.message }, { status: 500 });
   if (!movie?.video_key) return Response.json({ error: "Киноны эх видео олдсонгүй." }, { status: 404 });
   if (await secureHlsReady(id)) return Response.json({ ok: true, status: "ready" });
-  const child = spawn(process.execPath, ["scripts/protect-video.mjs", id], { cwd: process.cwd(), env: process.env, detached: true, stdio: "ignore" });
+  mkdirSync("logs", { recursive: true });
+  const log = openSync("logs/secure-video.log", "a", 0o600);
+  const child = spawn(process.execPath, ["scripts/protect-video.mjs", id], { cwd: process.cwd(), env: process.env, detached: true, stdio: ["ignore", log, log] });
   child.unref();
+  closeSync(log);
   return Response.json({ ok: true, status: "queued" }, { status: 202 });
 }
