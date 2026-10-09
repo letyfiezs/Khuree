@@ -1,9 +1,0 @@
-{
-  "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "khuree-video-delivery",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-10-01",
-  "r2_buckets": [
-    { "binding": "VIDEOS", "bucket_name": "khuree-video-private" }
-  ]
-}

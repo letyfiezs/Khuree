@@ -71,8 +71,6 @@ export function AdminMovies({
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
-  const [protectingId, setProtectingId] = useState<string | null>(null);
-  const [protection, setProtection] = useState<Record<string, "queued" | "ready">>({});
   const fileInput = useRef<HTMLInputElement>(null);
   const visibleItems = useMemo(() => {
     return items.filter((item) => (statusFilter === "all" || item.status === statusFilter) && matchesSearch(query, item.title, item.slug, item.seriesTitle ?? ""));
@@ -684,21 +682,6 @@ export function AdminMovies({
     }
     setItems((current) => current.filter((item) => item.id !== movie.id));
   }
-  async function protectMovie(movie: ContentItem) {
-    if (!window.confirm(`“${movie.title}” киног private encrypted stream болгон бэлтгэх үү? Эх MP4 устахгүй.`)) return;
-    setError("");
-    setProtectingId(movie.id);
-    try {
-      const response = await fetch(`/api/admin/movies/${movie.id}/protect`, { method: "POST" });
-      const data = (await response.json()) as { error?: string; status?: "queued" | "ready" };
-      if (!response.ok) throw new Error(data.error ?? "Хамгаалалт эхлүүлж чадсангүй.");
-      setProtection((current) => ({ ...current, [movie.id]: data.status ?? "queued" }));
-    } catch (protectError) {
-      setError(protectError instanceof Error ? protectError.message : "Хамгаалалт эхлүүлж чадсангүй.");
-    } finally {
-      setProtectingId(null);
-    }
-  }
   return (
     <>
       <div className="admin-toolbar content-admin-toolbar">
@@ -734,7 +717,7 @@ export function AdminMovies({
                 <b>{item.title}</b>
                 <small>
                   {item.videoKey
-                    ? `${item.kind === "series" && item.seriesTitle ? `${item.seriesTitle} · S${item.seasonNumber} E${item.episodeNumber} · ` : ""}Видео${forcedCategory === verticalDramaCategory ? " · Бүтнээр тоглоно" : ""} · ${protection[item.id] === "ready" ? "🔒 Private HLS" : protection[item.id] === "queued" ? "⏳ Хамгаалж байна" : "MP4"} · ${item.subtitles?.length ?? 0} subtitle`
+                    ? `${item.kind === "series" && item.seriesTitle ? `${item.seriesTitle} · S${item.seasonNumber} E${item.episodeNumber} · ` : ""}Видео${forcedCategory === verticalDramaCategory ? " · Бүтнээр тоглоно" : ""} · ${item.subtitles?.length ?? 0} subtitle`
                     : item.slug}
                 </small>
               </span>
@@ -774,11 +757,6 @@ export function AdminMovies({
               <button className="row-action" onClick={() => openEditor(item)}>
                 Засах
               </button>
-              {item.videoKey && protection[item.id] !== "ready" && (
-                <button className="row-action" disabled={protectingId === item.id || protection[item.id] === "queued"} onClick={() => void protectMovie(item)}>
-                  {protectingId === item.id || protection[item.id] === "queued" ? "Хүлээнэ үү…" : "🔒 Хамгаалах"}
-                </button>
-              )}
               <button
                 className="row-action danger"
                 onClick={() => void deleteMovie(item)}

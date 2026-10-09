@@ -37,10 +37,11 @@ export function VerticalReels({ items }: { items: VerticalReelItem[] }) {
       <Link href="/">← Нүүр</Link><div><b>Босоо драма алга байна</b><span>Admin хэсгээс “Босоо драма” ангилалтай видео нэмнэ үү.</span></div>
     </main>
   );
-  return <main className="vertical-reels-page"><div ref={feedRef} className="vertical-reel-feed">{items.map((item) => <VerticalReelPlayer item={item} active={item.id === activeId} key={item.id} />)}</div></main>;
+  const activeIndex = Math.max(0, items.findIndex((item) => item.id === activeId));
+  return <main className="vertical-reels-page"><div ref={feedRef} className="vertical-reel-feed">{items.map((item, index) => <VerticalReelPlayer item={item} active={index === activeIndex} prepare={Math.abs(index - activeIndex) <= 1} key={item.id} />)}</div></main>;
 }
 
-function VerticalReelPlayer({ item, active }: { item: VerticalReelItem; active: boolean }) {
+function VerticalReelPlayer({ item, active, prepare }: { item: VerticalReelItem; active: boolean; prepare: boolean }) {
   const router = useRouter();
   const frameRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -70,13 +71,12 @@ function VerticalReelPlayer({ item, active }: { item: VerticalReelItem; active: 
       video.pause();
       return;
     }
-    if (video.readyState === 0) video.load();
     void video.play().catch((error: unknown) => {
       if (error instanceof DOMException && error.name === "AbortError") return;
       setLoading(false);
       setShowPlay(true);
     });
-  }, [active, item.videoUrl]);
+  }, [active, prepare, item.videoUrl]);
 
   useEffect(() => { if (videoRef.current) videoRef.current.muted = muted; }, [muted]);
 
@@ -243,13 +243,12 @@ function VerticalReelPlayer({ item, active }: { item: VerticalReelItem; active: 
       <article data-reel-id={item.id} className="vertical-reel" onPointerDown={(event) => {
         if (!event.isPrimary || !startLongPress(event.target)) return;
         pointerStartYRef.current = event.clientY;
-        event.currentTarget.setPointerCapture(event.pointerId);
       }} onPointerMove={(event) => {
         const startY = pointerStartYRef.current;
         if (startY !== undefined && Math.abs(startY - event.clientY) > 12) stopLongPress();
       }} onPointerUp={() => finishPointer()} onPointerCancel={() => { pointerStartYRef.current = undefined; longPressTriggeredRef.current = false; stopLongPress(); }}>
         <section ref={frameRef} className={`vertical-reel-frame ${controlsVisible ? "controls-visible" : "controls-hidden"}`} onClick={(event) => handleFrameTap(event.clientX)} onContextMenu={(event) => event.preventDefault()} onDragStart={(event) => event.preventDefault()}>
-          <video ref={videoRef} src={item.videoUrl} poster={item.posterUrl} autoPlay={active} playsInline muted={muted} preload={active ? "auto" : "metadata"} onLoadStart={() => setLoading(true)} onWaiting={() => setLoading(true)} onSeeking={() => setLoading(true)} onSeeked={() => setLoading(false)} onCanPlay={(event) => { if (active && event.currentTarget.paused) void event.currentTarget.play().catch(() => { setLoading(false); setShowPlay(true); }); }} onPlaying={() => { setLoading(false); setPlaying(true); setShowPlay(false); setVideoError(""); revealControls(); recordView(); }} onPause={() => { setPlaying(false); setShowPlay(true); revealControls(false); }} onError={() => { setLoading(false); setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); revealControls(false); }} onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget)} onEnded={() => { setPlaying(false); setShowPlay(true); setProgress(1); revealControls(false); }}>
+          <video ref={videoRef} src={prepare ? item.videoUrl : undefined} poster={item.posterUrl} autoPlay={active} playsInline muted={muted} preload={active ? "auto" : prepare ? "metadata" : "none"} onLoadStart={() => setLoading(true)} onWaiting={() => setLoading(true)} onSeeking={() => setLoading(true)} onSeeked={() => setLoading(false)} onCanPlay={(event) => { if (active && event.currentTarget.paused) void event.currentTarget.play().catch(() => { setLoading(false); setShowPlay(true); }); }} onPlaying={() => { setLoading(false); setPlaying(true); setShowPlay(false); setVideoError(""); revealControls(); recordView(); }} onPause={() => { setPlaying(false); setShowPlay(true); revealControls(false); }} onError={() => { setLoading(false); setShowPlay(true); setVideoError("Видео ачаалж чадсангүй. Интернэтээ шалгаад дахин оролдоно уу."); revealControls(false); }} onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget)} onEnded={() => { setPlaying(false); setShowPlay(true); setProgress(1); revealControls(false); }}>
             {item.subtitles.map((subtitle) => subtitle.sourceUrl && <track default={subtitle === item.subtitles[0]} key={subtitle.id} kind="subtitles" label={subtitle.label} src={subtitle.sourceUrl} srcLang={subtitle.language} />)}
           </video>
           <div className="vertical-reel-shade" />
