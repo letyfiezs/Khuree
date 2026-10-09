@@ -23,8 +23,19 @@ const r2 = new S3Client({
 const edgeUrl = process.env.VIDEO_EDGE_URL.replace(/\/$/, "");
 const assetId = movieId;
 let workDir;
-const lockDir = join(tmpdir(), `khuree-hls-lock-${movieId}`);
+const lockDir = join(tmpdir(), "khuree-hls-worker.lock");
 let lockAcquired = false;
+
+async function acquireLock() {
+  for (let attempt = 0; attempt < 1_080; attempt += 1) {
+    try { await mkdir(lockDir); return; }
+    catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+      await new Promise((resolve) => setTimeout(resolve, 10_000));
+    }
+  }
+  throw new Error("Secure video worker queue timed out.");
+}
 
 function runFfmpeg(args) {
   return new Promise((resolve, reject) => {
@@ -53,10 +64,14 @@ async function upload(filename, contentType) {
 }
 
 try {
-  const ready = await fetch(`${edgeUrl}/internal/hls/${assetId}/index.m3u8`, { method: "HEAD", headers: { "x-khuree-internal-secret": process.env.VIDEO_EDGE_SECRET } });
-  if (ready.ok) process.exit(0);
-  await mkdir(lockDir);
+  await acquireLock();
   lockAcquired = true;
+  const ready = await fetch(`${edgeUrl}/internal/hls/${assetId}/index.m3u8`, { method: "HEAD", headers: { "x-khuree-internal-secret": process.env.VIDEO_EDGE_SECRET } });
+  if (ready.ok) {
+    await rm(lockDir, { recursive: true, force: true });
+    lockAcquired = false;
+    process.exit(0);
+  }
   const { data: movie, error } = await db.from("movies").select("id,video_key,bytes").eq("id", movieId).maybeSingle();
   if (error) throw error;
   if (!movie?.video_key) throw new Error("Movie video is missing.");
