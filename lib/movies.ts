@@ -23,12 +23,25 @@ export function mapMovie(row: MovieRow): ContentItem {
 }
 const selection = "*,genres:movie_genres(genres(name)),subtitles(id,label,language,object_key,original_filename)";
 export const listMovies = cache(async function listMovies() {
-  const { data, error } = await createSupabaseAdminClient().from("movies").select(selection).order("created_at", { ascending: false });
-  if (error) throw error; return (data as unknown as MovieRow[]).map(mapMovie);
+  const db = createSupabaseAdminClient();
+  const pageSize = 500;
+  const rows: MovieRow[] = [];
+  let lastId: string | undefined;
+  for (;;) {
+    let query = db.from("movies").select(selection).order("id", { ascending: false }).limit(pageSize);
+    if (lastId) query = query.lt("id", lastId);
+    const { data, error } = await query;
+    if (error) throw error;
+    const page = (data ?? []) as unknown as MovieRow[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+    lastId = page[page.length - 1].id;
+  }
+  return rows.sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id)).map(mapMovie);
 });
 const listPublicMoviesCached = unstable_cache(
   async () => (await listMovies()).filter((item) => item.status === "published"),
-  ["khuree-public-movies-v1"],
+  ["khuree-public-movies-v2"],
   { revalidate: 30, tags: ["catalog"] },
 );
 export const listPublicMovies = cache(listPublicMoviesCached);

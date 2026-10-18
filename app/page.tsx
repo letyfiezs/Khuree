@@ -13,6 +13,7 @@ export default async function Home() {
   const [allItems, popularIds] = await Promise.all([getBrowseCatalog(), popularMovieIds()]);
   const items = allItems.filter((item) => item.age !== "18+");
   const verticalDramas = items.filter(isVerticalDrama);
+  const free = items.filter((item) => item.isFree);
   const series = items.filter((item) => item.kind === "series");
   const movies = items.filter((item) => item.kind === "movie" && !isVerticalDrama(item));
   const adult = allItems.filter((item) => item.age === "18+");
@@ -80,6 +81,7 @@ export default async function Home() {
       <RecentlyWatched />
       <LiveNowTopFive />
       <HomeRail kicker="ОДОО ҮЗЭХ" title="Шинээр нэмэгдсэн" href="/movies" items={items} />
+      <HomeRail kicker="ТӨЛБӨРГҮЙ ҮЗЭХ" title="Үнэгүй" href="/free" items={free} />
       <HomeRail kicker="БҮРЭН ХЭМЖЭЭНИЙ" title="Кино" href="/movies" items={movies} />
       <HomeRail kicker="БОСООГООР ҮЗЭХ" title="Босоо драма" href="/vertical" items={verticalDramas} />
       <HomeRail kicker="АНГИ БҮР ШИНЭ ТҮҮХ" title="Олон ангит" href="/series" items={series} />
