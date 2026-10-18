@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ResilientPoster } from "@/components/resilient-poster";
+import { RailScrollProgress } from "@/components/rail-scroll-progress";
 
 const REFRESH_INTERVAL_MS = 10_000;
 
@@ -60,7 +61,7 @@ export function LiveNowTopFive() {
         </div>
       </div>
       {items.length ? (
-        <div className="film-rail live-now-rail">
+        <><div className="film-rail live-now-rail" tabIndex={0} aria-label="Одоо үзэж буй киног хажуу тийш гүйлгэх">
           {items.map((item, index) => (
             <Link
               href={item.kind === "series" && item.seriesId ? `/series/${item.seriesId}` : `/movie/${encodeURIComponent(item.slug)}`}
@@ -78,7 +79,7 @@ export function LiveNowTopFive() {
               <p>{item.year ?? "Шинэ"} · яг одоо {item.viewerCount} үзэгч</p>
             </Link>
           ))}
-        </div>
+        </div><RailScrollProgress /></>
       ) : (
         <p className="live-empty">{loaded ? "Одоогоор кино үзэж байгаа идэвхтэй үзэгч алга." : "Live үзэлтийг уншиж байна…"}</p>
       )}

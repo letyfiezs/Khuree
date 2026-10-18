@@ -286,6 +286,9 @@ h1 em {
 .film-rail::-webkit-scrollbar { height: 8px; }
 .film-rail::-webkit-scrollbar-thumb { border-radius: 8px; background: #666; }
 .film-rail .film-card { scroll-snap-align: start; }
+.film-rail-progress { position: relative; width: min(180px, 42vw); height: 4px; margin: 8px auto 0; border-radius: 99px; background: #ffffff35; }
+.film-rail-progress[hidden] { display: none; }
+.film-rail-progress span { position: absolute; top: 0; left: 0; height: 100%; border-radius: inherit; background: #e50914; }
 .film-card h3 {
   font-size: 13px;
   margin: 13px 0 4px;
