@@ -37,7 +37,7 @@ const listPublicSeriesCached = unstable_cache(async function listPublicSeries() 
   return shows
     .map((show) => seriesCard(show, movies.filter((movie) => movie.kind === "series" && movie.seriesId === show.id && movie.status === "published")))
     .filter((show): show is ContentItem => Boolean(show));
-}, ["khuree-public-series-v1"], { revalidate: 30, tags: ["catalog", "series"] });
+}, ["khuree-public-series-v2"], { revalidate: 30, tags: ["catalog", "series"] });
 export const listPublicSeries = cache(listPublicSeriesCached);
 
 export async function getPublicSeries(id: string) {
