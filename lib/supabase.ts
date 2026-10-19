@@ -24,6 +24,11 @@ export async function createSupabaseServerClient() {
   });
 }
 
+export function createSupabaseAuthClient() {
+  const { url, anonKey } = config();
+  return createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
 export function createSupabaseAdminClient() {
   const { url } = config();
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

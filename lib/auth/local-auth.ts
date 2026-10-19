@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase";
 import { authEmail, normalizeIdentifier, pinPassword } from "@/lib/auth/pin-auth";
 
@@ -28,11 +29,21 @@ export function createAdminSessionValue() { return adminSessionToken(); }
 function pinHash(pin: string) { return createHash("sha256").update(pin).digest("hex"); }
 function safeEqual(a: string, b: string) { const aa = Buffer.from(a), bb = Buffer.from(b); return aa.length === bb.length && timingSafeEqual(aa, bb); }
 
-export async function getCurrentUser(): Promise<LocalUser | null> {
+async function userFromBearer(): Promise<User | null> {
+  const authorization = (await headers()).get("authorization") ?? "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  if (!token) return null;
+  const { data, error } = await createSupabaseAdminClient().auth.getUser(token);
+  return error ? null : data.user ?? null;
+}
+
+export async function getCurrentUser(authUser?: User | null): Promise<LocalUser | null> {
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user: cookieUser } } = await supabase.auth.getUser();
+  const user = authUser ?? cookieUser ?? (await userFromBearer());
   if (!user) return null;
-  const { data: profile } = await supabase.from("profiles").select("display_name,role,adult_enabled,parental_pin_hash,adult_unlocked_until").eq("id", user.id).maybeSingle();
+  const profiles = cookieUser && !authUser ? supabase : createSupabaseAdminClient();
+  const { data: profile } = await profiles.from("profiles").select("display_name,role,adult_enabled,parental_pin_hash,adult_unlocked_until").eq("id", user.id).maybeSingle();
   const entitlement = user.app_metadata?.entitlement as { enabled?: boolean; expiresAt?: string } | undefined;
   const entitlementActive = entitlement ? entitlement.enabled !== false && (!entitlement.expiresAt || entitlement.expiresAt > new Date().toISOString()) : false;
   const now = new Date().toISOString();
@@ -122,8 +133,12 @@ export async function requireAdultAccess(user: LocalUser, returnTo: string) {
 export function requireWatchAccess(user: LocalUser, section: WatchSection) {
   if ((!user.canWatch || !user.watchPermissions[section]) && user.role !== "admin") redirect("/subscribe");
 }
+export async function getRequestDeviceId() {
+  return (await cookies()).get("khuree-device-id")?.value ?? (await headers()).get("x-khuree-device-id") ?? undefined;
+}
+
 export async function requireDeviceAccess(user: LocalUser, returnTo: string) {
   if (user.role === "admin") return;
-  const deviceId = (await cookies()).get("khuree-device-id")?.value;
+  const deviceId = await getRequestDeviceId();
   if (!deviceId || !user.devices.some((device) => device.id === deviceId)) redirect(`/account?deviceSetup=1&returnTo=${encodeURIComponent(returnTo)}`);
 }

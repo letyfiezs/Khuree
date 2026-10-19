@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) return Response.json({ error: "Нэвтрэх шаардлагатай." }, { status: 401 });
   const store = await cookies();
-  let currentId = store.get(cookieName)?.value;
+  let currentId = store.get(cookieName)?.value ?? (await headers()).get("x-khuree-device-id") ?? undefined;
   if (currentId && !user.devices.some((device) => device.id === currentId)) currentId = undefined;
   const savedId = new URL(request.url).searchParams.get("deviceId");
   const fingerprint = new URL(request.url).searchParams.get("fingerprint");
